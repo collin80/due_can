@@ -17,7 +17,7 @@
 */
 
 
-#include "CAN.h"
+#include "due_can.h"
 #include "sn65hvd234.h"
 
 /** Define the timemark mask. */
@@ -149,6 +149,13 @@ uint32_t CANRaw::init(uint32_t ul_mck, uint32_t ul_baudrate)
 {
 	uint32_t ul_flag;
 	uint32_t ul_tick;
+	
+//arduino 1.5.2 doesn't init canbus so make sure to do it here. 
+#ifdef ARDUINO152
+	PIO_Configure(PIOA,PIO_PERIPH_A, PIO_PA1A_CANRX0|PIO_PA0A_CANTX0, PIO_DEFAULT);
+	PIO_Configure(PIOB,PIO_PERIPH_A, PIO_PB15A_CANRX1|PIO_PB14A_CANTX1, PIO_DEFAULT);
+#endif
+	
 	if (m_pCan == CAN0) pmc_enable_periph_clk(ID_CAN0);
 	if (m_pCan == CAN1) pmc_enable_periph_clk(ID_CAN1);
 
@@ -171,7 +178,7 @@ uint32_t CANRaw::init(uint32_t ul_mck, uint32_t ul_baudrate)
 	ul_flag = 0;
 	ul_tick = 0;
 	while (!(ul_flag & CAN_SR_WAKEUP) && (ul_tick < CAN_TIMEOUT)) {
-		ul_flag = can_get_status(m_pCan);
+		ul_flag = m_pCan->CAN_SR;
 		ul_tick++;
 	}
 

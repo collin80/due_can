@@ -71,6 +71,20 @@ typedef struct {
 
 #include "sn65hvd234.h"
 
+//add some extra stuff that is needed for Arduino 1.5.2
+#ifndef PINS_CAN0
+	static const uint8_t CAN1RX = 88;
+	static const uint8_t CAN1TX = 89;
+
+	// CAN0
+	#define PINS_CAN0            (90u)
+	// CAN1
+	#define PINS_CAN1            (91u)
+	#define ARDUINO152
+#endif
+
+	  
+
 #define CAN0_RS  61
 #define CAN0_EN  62
 #define CAN1_RS  63
