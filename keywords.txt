@@ -1,0 +1,99 @@
+###classes, datatypes, C++ keywords
+RX_CAN_FRAME	KEYWORD1
+TX_CAN_FRAME	KEYWORD1
+
+
+###functions and methods
+set_baudrate	KEYWORD2
+init	KEYWORD2
+enable	KEYWORD2
+disable	KEYWORD2
+disable_low_power_mode	KEYWORD2
+enable_low_power_mode	KEYWORD2
+disable_autobaud_listen_mode	KEYWORD2
+enable_autobaud_listen_mode	KEYWORD2
+disable_overload_frame	KEYWORD2
+enable_overload_frame	KEYWORD2
+set_timestamp_capture_point	KEYWORD2
+disable_time_triggered_mode	KEYWORD2
+enable_time_triggered_mode	KEYWORD2
+disable_timer_freeze	KEYWORD2
+enable_timer_freeze	KEYWORD2
+disable_tx_repeat	KEYWORD2
+enable_tx_repeat	KEYWORD2
+set_rx_sync_stage	KEYWORD2
+enable_interrupt	KEYWORD2
+disable_interrupt	KEYWORD2
+get_interrupt_mask	KEYWORD2
+get_status	KEYWORD2
+get_internal_timer_value	KEYWORD2
+get_timestamp_value	KEYWORD2
+get_tx_error_cnt	KEYWORD2
+get_rx_error_cnt	KEYWORD2
+reset_internal_timer	KEYWORD2
+global_send_transfer_cmd	KEYWORD2
+global_send_abort_cmd	KEYWORD2
+mailbox_set_timemark	KEYWORD2
+mailbox_get_status	KEYWORD2
+mailbox_send_transfer_cmd	KEYWORD2
+mailbox_send_abort_cmd	KEYWORD2
+mailbox_init	KEYWORD2
+mailbox_read	KEYWORD2
+mailbox_tx_frame	KEYWORD2
+mailbox_set_id	KEYWORD2
+mailbox_set_priority	KEYWORD2
+mailbox_set_accept_mask	KEYWORD2
+mailbox_set_mode	KEYWORD2
+mailbox_set_databyte	KEYWORD2
+mailbox_set_datalen	KEYWORD2
+mailbox_set_datal	KEYWORD2
+mailbox_set_datah	KEYWORD2
+reset_all_mailbox	KEYWORD2
+rx_avail	KEYWORD2
+get_rx_buff	KEYWORD2
+
+###setup and loop functions, also serial
+CAN	KEYWORD3
+CAN2	KEYWORD3
+
+
+###Constants
+CAN_BPS_1000K	LITERAL1
+CAN_BPS_800K	LITERAL1
+CAN_BPS_500K	LITERAL1
+CAN_BPS_250K	LITERAL1
+CAN_BPS_125K	LITERAL1
+CAN_BPS_50K	LITERAL1
+CAN_BPS_25K	LITERAL1
+CAN_BPS_10K	LITERAL1
+CAN_BPS_5K	LITERAL1
+CAN_MB_DISABLE_MODE	LITERAL1
+CAN_MB_RX_MODE	LITERAL1
+CAN_MB_RX_OVER_WR_MODE	LITERAL1
+CAN_MB_TX_MODE	LITERAL1
+CAN_MB_CONSUMER_MODE	LITERAL1
+CAN_MB_PRODUCER_MODE	LITERAL1
+CAN_TCR_MB0	LITERAL1
+CAN_TCR_MB1	LITERAL1
+CAN_TCR_MB2	LITERAL1
+CAN_TCR_MB3	LITERAL1
+CAN_TCR_MB4	LITERAL1
+CAN_TCR_MB5	LITERAL1
+CAN_TCR_MB6	LITERAL1
+CAN_TCR_MB7	LITERAL1
+CAN_MSR_MRDY	LITERAL1
+CAN_IER_MB0	LITERAL1
+CAN_IER_MB1	LITERAL1
+CAN_IER_MB2	LITERAL1
+CAN_IER_MB3	LITERAL1
+CAN_IER_MB4	LITERAL1
+CAN_IER_MB5	LITERAL1
+CAN_IER_MB6	LITERAL1
+CAN_IER_MB7	LITERAL1
+CAN_DISABLE_ALL_INTERRUPT_MASK	LITERAL1
+CAN0_IRQn	LITERAL1
+CAN1_IRQn	LITERAL1
+
+###Built-in variables l2
+
+
