@@ -7,7 +7,7 @@
 
 // Required libraries
 #include "variant.h"
-#include <CAN.h>
+#include <due_can.h>
 
 #define TEST1_CAN_TRANSFER_ID    0x11AE756A //random 29 bits
 #define TEST1_CAN0_TX_PRIO       15

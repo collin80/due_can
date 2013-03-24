@@ -5,7 +5,7 @@
 
 // Required libraries
 #include "variant.h"
-#include <CAN.h>
+#include <due_can.h>
 
 #define TEST1_CAN_COMM_MB_IDX    0
 #define TEST1_CAN_TRANSFER_ID    0x07
