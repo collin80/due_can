@@ -88,7 +88,7 @@ typedef struct {
 #define CAN0_RS  61
 #define CAN0_EN  62
 #define CAN1_RS  63
-#define CAN1_EN  64
+#define CAN1_EN  65
 
 /** Define the Mailbox mask for eight mailboxes. */
 #define GLOBAL_MAILBOX_MASK           0x000000ff
@@ -97,15 +97,16 @@ typedef struct {
 #define CAN_DISABLE_ALL_INTERRUPT_MASK 0xffffffff
 
 /** Define the typical baudrate for CAN communication in KHz. */
-#define CAN_BPS_1000K                 1000
-#define CAN_BPS_800K                  800
-#define CAN_BPS_500K                  500
-#define CAN_BPS_250K                  250
-#define CAN_BPS_125K                  125
-#define CAN_BPS_50K                   50
-#define CAN_BPS_25K                   25
-#define CAN_BPS_10K                   10
-#define CAN_BPS_5K                    5
+#define CAN_BPS_1000K                 1000000
+#define CAN_BPS_800K                  800000
+#define CAN_BPS_500K                  500000
+#define CAN_BPS_250K                  250000
+#define CAN_BPS_125K                  125000
+#define CAN_BPS_50K                   50000
+#define CAN_BPS_33333		      33333
+#define CAN_BPS_25K                   25000
+#define CAN_BPS_10K                   10000
+#define CAN_BPS_5K                    5000
 
 /** Define the mailbox mode. */
 #define CAN_MB_DISABLE_MODE           0
@@ -225,6 +226,7 @@ void mailbox_set_databyte(uint8_t uc_index, uint8_t bytepos, uint8_t val);
 void mailbox_set_datalen(uint8_t uc_index, uint8_t dlen);
 void mailbox_set_datal(uint8_t uc_index, uint32_t val);
 void mailbox_set_datah(uint8_t uc_index, uint32_t val);
+void sendFrame(TX_CAN_FRAME& txFrame);
 
 void reset_all_mailbox();
 void interruptHandler();

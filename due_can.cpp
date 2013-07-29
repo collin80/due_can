@@ -87,13 +87,13 @@ uint32_t CANRaw::set_baudrate(uint32_t ul_mck, uint32_t ul_baudrate)
 	can_bit_timing_t *p_bit_time;
 
 	/* Check whether the baudrate prescale will be greater than the max divide value. */
-	if (((ul_mck + (ul_baudrate * CAN_MAX_TQ_NUM * 1000 - 1)) /
-		(ul_baudrate * CAN_MAX_TQ_NUM * 1000)) > CAN_BAUDRATE_MAX_DIV) {
+	if (((ul_mck + (ul_baudrate * CAN_MAX_TQ_NUM - 1)) /
+		(ul_baudrate * CAN_MAX_TQ_NUM)) > CAN_BAUDRATE_MAX_DIV) {
 		return 0;
 	}
 
 	/* Check whether the input MCK is too small. */
-	if (ul_mck  < ul_baudrate * CAN_MIN_TQ_NUM * 1000) {
+	if (ul_mck  < ul_baudrate * CAN_MIN_TQ_NUM) {
 		return 0;
 	}
 
@@ -104,8 +104,8 @@ uint32_t CANRaw::set_baudrate(uint32_t ul_mck, uint32_t ul_baudrate)
 	ul_mod = 0xffffffff;
 	/* Find out the approximate Time Quantum according to the baudrate. */
 	for (uint8_t i = CAN_MIN_TQ_NUM; i <= CAN_MAX_TQ_NUM; i++) {
-		if ((ul_mck / (ul_baudrate * i * 1000)) <= CAN_BAUDRATE_MAX_DIV) {
-			ul_cur_mod = ul_mck % (ul_baudrate * i * 1000);
+		if ((ul_mck / (ul_baudrate * i)) <= CAN_BAUDRATE_MAX_DIV) {
+			ul_cur_mod = ul_mck % (ul_baudrate * i);
 			if (ul_cur_mod < ul_mod){
 				ul_mod = ul_cur_mod;
 				uc_tq = i;
@@ -117,7 +117,7 @@ uint32_t CANRaw::set_baudrate(uint32_t ul_mck, uint32_t ul_baudrate)
 	}
 
 	/* Calculate the baudrate prescale value. */
-	uc_prescale = ul_mck / (ul_baudrate * uc_tq * 1000);
+	uc_prescale = ul_mck / (ul_baudrate * uc_tq);
 
 	/* Get the right CAN BIT Timing group. */
 	p_bit_time = (can_bit_timing_t *)&can_bit_time[uc_tq - CAN_MIN_TQ_NUM];
@@ -540,6 +540,44 @@ void CANRaw::mailbox_init(uint8_t uc_index)
 	m_pCan->CAN_MB[uc_index].CAN_MCR = 0;
 }
 
+
+/*
+Does one of two things, either sends the given frame out on the first
+TX mailbox that's open or queues the frame for sending later via interrupts.
+*/
+void CANRaw::sendFrame(TX_CAN_FRAME& txFrame) 
+{
+	bool foundTX = false;
+	for (int i = 0; i < 8; i++) {
+		if (((m_pCan->CAN_MB[i].CAN_MMR >> 24) & 7) == 3)
+		{//is this mailbox set up as a TX box?
+			if (m_pCan->CAN_MB[i].CAN_MSR & CAN_MSR_MRDY) 
+			{//is it also available (not sending anything?)
+				foundTX = true;
+				mailbox_set_id(i, txFrame.id, txFrame.ide);
+				mailbox_set_datalen(i, txFrame.dlc);
+				mailbox_set_priority(i, txFrame.priority);
+				for (uint8_t cnt = 0; cnt < 8; cnt++)
+					mailbox_set_databyte(i, cnt, txFrame.data[cnt]);
+				enable_interrupt(0x01u << i); //enable the TX interrupt for this box
+				global_send_transfer_cmd((0x1u << i));
+				return; //we've sent it. mission accomplished.
+			}
+		}
+	}
+	if (!foundTX) //there was no open TX boxes. Queue it.
+	{
+		tx_frame_buff[tx_buffer_tail].id = txFrame.id;
+		tx_frame_buff[tx_buffer_tail].ide = txFrame.ide;
+		tx_frame_buff[tx_buffer_tail].dlc = txFrame.dlc;
+		for (int c = 0; c < 8; c++)  
+			tx_frame_buff[tx_buffer_tail].data[c] = txFrame.data[c];
+		tx_buffer_tail = (tx_buffer_tail + 1) % SIZE_TX_BUFFER;
+		return;
+	}
+}
+
+
 /**
  * \brief Read a frame from out of the mailbox and into a software buffer
  *
@@ -815,7 +853,7 @@ void CANRaw::interruptHandler() {
 void CANRaw::mailbox_int_handler(uint8_t mb, uint32_t ul_status) {
 	if (mb > 7) mb = 7;
 	if (m_pCan->CAN_MB[mb].CAN_MSR & CAN_MSR_MRDY) { //mailbox signals it is ready
-		switch((m_pCan->CAN_MB[mb].CAN_MMR >> 24) & 7) { //what sort of mailbox is it?
+		switch(((m_pCan->CAN_MB[mb].CAN_MMR >> 24) & 7)) { //what sort of mailbox is it?
 		case 1: //receive
 		case 2: //receive w/ overwrite
 		case 4: //consumer - technically still a receive buffer
@@ -823,6 +861,17 @@ void CANRaw::mailbox_int_handler(uint8_t mb, uint32_t ul_status) {
 			rx_buffer_head = (rx_buffer_head + 1) % SIZE_RX_BUFFER;
 			break;
 		case 3: //transmit
+			if (tx_buffer_head != tx_buffer_tail) 
+			{ //if there is a frame in the queue to send
+				mailbox_set_id(mb, tx_frame_buff[tx_buffer_head].id, tx_frame_buff[tx_buffer_head].ide);
+				mailbox_set_datalen(mb, tx_frame_buff[tx_buffer_head].dlc);
+				mailbox_set_priority(mb, tx_frame_buff[tx_buffer_head].priority);
+				for (uint8_t cnt = 0; cnt < 8; cnt++)
+					mailbox_set_databyte(mb, cnt, tx_frame_buff[tx_buffer_head].data[cnt]);
+				global_send_transfer_cmd((0x1u << mb));
+				tx_buffer_head = (tx_buffer_head + 1) % SIZE_TX_BUFFER;
+			}
+			break;
 		case 5: //producer - technically still a transmit buffer
 			break;
 		}
