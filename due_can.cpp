@@ -871,6 +871,9 @@ void CANRaw::mailbox_int_handler(uint8_t mb, uint32_t ul_status) {
 				global_send_transfer_cmd((0x1u << mb));
 				tx_buffer_head = (tx_buffer_head + 1) % SIZE_TX_BUFFER;
 			}
+			else {
+				disable_interrupt(0x01 << mb);
+			}
 			break;
 		case 5: //producer - technically still a transmit buffer
 			break;
