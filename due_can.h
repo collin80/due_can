@@ -103,7 +103,7 @@ typedef struct {
 #define CAN_BPS_250K                  250000
 #define CAN_BPS_125K                  125000
 #define CAN_BPS_50K                   50000
-#define CAN_BPS_33333		      33333
+#define CAN_BPS_33333				  33333
 #define CAN_BPS_25K                   25000
 #define CAN_BPS_10K                   10000
 #define CAN_BPS_5K                    5000
@@ -129,21 +129,12 @@ typedef struct
 {
 	uint32_t id;		// EID if ide set, SID otherwise
 	uint32_t fid;		// family ID
-	uint8_t rtr;			// Remote Transmission Request
-	uint8_t ide;			// Extended ID flag
-	uint8_t dlc;			// Number of data bytes
-	uint8_t data[8];		// Data bytes
-} RX_CAN_FRAME;
-
-typedef struct
-{
-	uint32_t id;		// EID if ide set, SID otherwise
-	uint8_t rtr;			// Remote Transmission Request
-	uint8_t ide;			// Extended ID flag
-	uint8_t dlc;			// Number of data bytes
-	uint8_t priority;		//transmit priority for this message
-	uint8_t data[8];		// Data bytes
-} TX_CAN_FRAME;
+	uint8_t rtr;		// Remote Transmission Request
+	uint8_t priority;	// Priority but only important for TX frames and then only for special uses.
+	uint8_t extended;	// Extended ID flag
+	uint8_t length;		// Number of data bytes
+	uint8_t data[8];	// Data bytes
+} CAN_FRAME;
 
 class CANRaw
 {
@@ -154,8 +145,10 @@ class CANRaw
     /* CAN Transceiver */
     SSN65HVD234* m_Transceiver;
 
-	volatile RX_CAN_FRAME rx_frame_buff[SIZE_RX_BUFFER];
-	volatile TX_CAN_FRAME tx_frame_buff[SIZE_TX_BUFFER];
+	int numTXBoxes; //There are 8 mailboxes, anything not TX will be set RX
+
+	volatile CAN_FRAME rx_frame_buff[SIZE_RX_BUFFER];
+	volatile CAN_FRAME tx_frame_buff[SIZE_TX_BUFFER];
 
 	volatile uint16_t rx_buffer_head, rx_buffer_tail;
 	volatile uint16_t tx_buffer_head, tx_buffer_tail;
@@ -182,8 +175,15 @@ class CANRaw
  * @{
  */
 
-uint32_t set_baudrate(uint32_t ul_mck, uint32_t ul_baudrate);
-uint32_t init(uint32_t ul_mck, uint32_t ul_baudrate);
+int setRXFilter(uint32_t id, uint32_t mask, bool extended);
+int setRXFilter(uint8_t mailbox, uint32_t id, uint32_t mask, bool extended);
+void setNumTXBoxes(int txboxes);
+int findFreeRXMailbox();
+uint8_t mailbox_get_mode(uint8_t uc_index);
+uint32_t mailbox_get_id(uint8_t uc_index);
+uint32_t getMailboxIer(int8_t mailbox);
+uint32_t set_baudrate(uint32_t ul_baudrate);
+uint32_t init(uint32_t ul_baudrate);
 void enable();
 void disable();
 void disable_low_power_mode();
@@ -216,7 +216,7 @@ uint32_t mailbox_get_status(uint8_t uc_index);
 void mailbox_send_transfer_cmd(uint8_t uc_index);
 void mailbox_send_abort_cmd(uint8_t uc_index);
 void mailbox_init(uint8_t uc_index);
-uint32_t mailbox_read(uint8_t uc_index, volatile RX_CAN_FRAME *rxframe);
+uint32_t mailbox_read(uint8_t uc_index, volatile CAN_FRAME *rxframe);
 uint32_t mailbox_tx_frame(uint8_t uc_index);
 void mailbox_set_id(uint8_t uc_index, uint32_t id, bool extended);
 void mailbox_set_priority(uint8_t uc_index, uint8_t pri);
@@ -226,12 +226,12 @@ void mailbox_set_databyte(uint8_t uc_index, uint8_t bytepos, uint8_t val);
 void mailbox_set_datalen(uint8_t uc_index, uint8_t dlen);
 void mailbox_set_datal(uint8_t uc_index, uint32_t val);
 void mailbox_set_datah(uint8_t uc_index, uint32_t val);
-void sendFrame(TX_CAN_FRAME& txFrame);
+void sendFrame(CAN_FRAME& txFrame);
 
 void reset_all_mailbox();
 void interruptHandler();
 bool rx_avail();
-uint32_t get_rx_buff(RX_CAN_FRAME *);
+uint32_t get_rx_buff(CAN_FRAME *);
 };
 
 extern CANRaw CAN;
