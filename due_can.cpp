@@ -199,7 +199,6 @@ uint32_t CANRaw::init(uint32_t ul_baudrate)
 	}
 }
 
-
 void CANRaw::setNumTXBoxes(int txboxes) {
 	int c;
 
@@ -210,6 +209,8 @@ void CANRaw::setNumTXBoxes(int txboxes) {
 	//Inialize RX boxen
 	for (c = 0; c < 8 - numTXBoxes; c++) {
 		mailbox_set_mode(c, CAN_MB_RX_MODE);
+		mailbox_set_id(c, 0x0, false);
+		mailbox_set_accept_mask(c, 0x7FF, false);
 	}
 
 	//Initialize TX boxen
@@ -602,7 +603,7 @@ void CANRaw::sendFrame(CAN_FRAME& txFrame)
 				mailbox_set_datalen(i, txFrame.length);
 				mailbox_set_priority(i, txFrame.priority);
 				for (uint8_t cnt = 0; cnt < 8; cnt++)
-					mailbox_set_databyte(i, cnt, txFrame.data[cnt]);
+					mailbox_set_databyte(i, cnt, txFrame.data.bytes[cnt]);
 				enable_interrupt(0x01u << i); //enable the TX interrupt for this box
 				global_send_transfer_cmd((0x1u << i));
 				return; //we've sent it. mission accomplished.
@@ -614,8 +615,7 @@ void CANRaw::sendFrame(CAN_FRAME& txFrame)
 		tx_frame_buff[tx_buffer_tail].id = txFrame.id;
 		tx_frame_buff[tx_buffer_tail].extended = txFrame.extended;
 		tx_frame_buff[tx_buffer_tail].length = txFrame.length;
-		for (int c = 0; c < 8; c++)  
-			tx_frame_buff[tx_buffer_tail].data[c] = txFrame.data[c];
+		tx_frame_buff[tx_buffer_tail].data.value = txFrame.data.value;
 		tx_buffer_tail = (tx_buffer_tail + 1) % SIZE_TX_BUFFER;
 		return;
 	}
@@ -662,14 +662,9 @@ uint32_t CANRaw::mailbox_read(uint8_t uc_index, volatile CAN_FRAME *rxframe)
 	rxframe->length = (ul_status & CAN_MSR_MDLC_Msk) >> CAN_MSR_MDLC_Pos;
 	ul_datal = m_pCan->CAN_MB[uc_index].CAN_MDL;
 	ul_datah = m_pCan->CAN_MB[uc_index].CAN_MDH;
-	rxframe->data[0] = (uint8_t)(ul_datal & 0xFF);
-    rxframe->data[1] = (uint8_t)((ul_datal>>8) & 0xFF);
-	rxframe->data[2] = (uint8_t)((ul_datal>>16) & 0xFF);
-	rxframe->data[3] = (uint8_t)((ul_datal>>24) & 0xFF);
-	rxframe->data[4] = (uint8_t)(ul_datah & 0xFF);
-	rxframe->data[5] = (uint8_t)((ul_datah>>8) & 0xFF);
-	rxframe->data[6] = (uint8_t)((ul_datah>>16) & 0xFF);
-	rxframe->data[7] = (uint8_t)((ul_datah>>24) & 0xFF);
+
+	rxframe->data.high = ul_datah;
+	rxframe->data.low = ul_datal;
 
 	/* Read the mailbox status again to check whether the software needs to re-read mailbox data register. */
 	ul_status = m_pCan->CAN_MB[uc_index].CAN_MSR;	
@@ -824,12 +819,12 @@ bool CANRaw::rx_avail() {
 	return (rx_buffer_head != rx_buffer_tail)?true:false;
 }
 
-uint32_t CANRaw::get_rx_buff(CAN_FRAME* buffer) {
+uint32_t CANRaw::get_rx_buff(CAN_FRAME& buffer) {
 	if (rx_buffer_head == rx_buffer_tail) return 0;
-	buffer->id = rx_frame_buff[rx_buffer_tail].id;
-	buffer->extended = rx_frame_buff[rx_buffer_tail].extended;
-	buffer->length = rx_frame_buff[rx_buffer_tail].length;
-	for (int c = 0; c < 8; c++) buffer->data[c] = rx_frame_buff[rx_buffer_tail].data[c];
+	buffer.id = rx_frame_buff[rx_buffer_tail].id;
+	buffer.extended = rx_frame_buff[rx_buffer_tail].extended;
+	buffer.length = rx_frame_buff[rx_buffer_tail].length;
+	buffer.data.value = rx_frame_buff[rx_buffer_tail].data.value;
 	rx_buffer_tail = (rx_buffer_tail + 1) % SIZE_RX_BUFFER;
 	return 1;
 }
@@ -992,7 +987,7 @@ void CANRaw::mailbox_int_handler(uint8_t mb, uint32_t ul_status) {
 				mailbox_set_datalen(mb, tx_frame_buff[tx_buffer_head].length);
 				mailbox_set_priority(mb, tx_frame_buff[tx_buffer_head].priority);
 				for (uint8_t cnt = 0; cnt < 8; cnt++)
-					mailbox_set_databyte(mb, cnt, tx_frame_buff[tx_buffer_head].data[cnt]);
+					mailbox_set_databyte(mb, cnt, tx_frame_buff[tx_buffer_head].data.bytes[cnt]);
 				global_send_transfer_cmd((0x1u << mb));
 				tx_buffer_head = (tx_buffer_head + 1) % SIZE_TX_BUFFER;
 			}

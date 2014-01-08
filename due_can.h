@@ -125,6 +125,23 @@ typedef struct {
 #define SIZE_RX_BUFFER	32 //RX incoming ring buffer is this big
 #define SIZE_TX_BUFFER	16 //TX ring buffer is this big
 
+//This is architecture specific. DO NOT USE THIS UNION ON ANYTHING OTHER THAN THE CORTEX M3 / Arduino Due
+//UNLESS YOU DOUBLE CHECK THINGS!
+typedef union {
+    uint64_t value;
+	struct {
+		uint32_t low;
+		uint32_t high;
+	};
+	struct {
+        uint16_t s0;
+		uint16_t s1;
+		uint16_t s2;
+		uint16_t s3;
+    };
+	uint8_t bytes[8];
+} BytesUnion;
+
 typedef struct
 {
 	uint32_t id;		// EID if ide set, SID otherwise
@@ -133,7 +150,7 @@ typedef struct
 	uint8_t priority;	// Priority but only important for TX frames and then only for special uses.
 	uint8_t extended;	// Extended ID flag
 	uint8_t length;		// Number of data bytes
-	uint8_t data[8];	// Data bytes
+	BytesUnion data;	// 64 bits - lots of ways to access it.
 } CAN_FRAME;
 
 class CANRaw
@@ -231,7 +248,7 @@ void sendFrame(CAN_FRAME& txFrame);
 void reset_all_mailbox();
 void interruptHandler();
 bool rx_avail();
-uint32_t get_rx_buff(CAN_FRAME *);
+uint32_t get_rx_buff(CAN_FRAME &);
 };
 
 extern CANRaw CAN;
