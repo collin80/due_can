@@ -18,6 +18,7 @@
 // Message variable to be send
 uint32_t CAN_MSG_1 = 0;
 
+//Leave defined if you use native port, comment if using programming port
 #define Serial SerialUSB
 
 void setup()
