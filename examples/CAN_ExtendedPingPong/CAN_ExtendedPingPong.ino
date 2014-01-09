@@ -21,7 +21,7 @@ uint32_t sentFrames, receivedFrames;
 //Leave this defined if you use the native port or comment it out if you use the programming port
 #define Serial SerialUSB
 
-CAN_FRAME frame1, frame2;
+CAN_FRAME frame1, frame2, incoming;
 
 void setup() {
 
@@ -36,10 +36,16 @@ void setup() {
     Serial.println("CAN initialization (sync) ERROR");
   }
   
+  //Initialize the definitions for the frames we'll be sending.
+  //This can be done here because the frame never changes
   frame1.id = TEST1_CAN_TRANSFER_ID;
   frame1.length = MAX_CAN_FRAME_DATA_LEN;
+  //Below we set the 8 data bytes in 32 bit (4 byte) chunks
+  //Bytes can be set individually with frame1.data.bytes[which] = something
   frame1.data.low = 0x20103040;
   frame1.data.high = CAN_MSG_DUMMY_DATA;
+  //We are using extended frames so mark that here. Otherwise it will just use
+  //the first 11 bits of the ID set
   frame1.extended = 1;
   
   frame2.id = TEST1_CAN_TRANSFER_ID + 0x200;
@@ -48,6 +54,10 @@ void setup() {
   frame2.data.high = 0x01020304;
   frame2.extended = 1;
   
+  //Both of these lines create a filter on the corresponding CAN device that allows
+  //just the one ID we're interested in to get through.
+  //The syntax is (mailbox #, ID, mask, extended)
+  //You can also leave off the mailbox number: (ID, mask, extended)
   CAN2.setRXFilter(0, TEST1_CAN_TRANSFER_ID + 0x200, 0x1FFFFFFF, true);
   CAN.setRXFilter(0, TEST1_CAN_TRANSFER_ID, 0x1FFFFFFF, true);
   
@@ -67,6 +77,7 @@ static void test_1(void)
 
   while (1==1) {
     if (CAN.rx_avail()) {
+      CAN.get_rx_buff(incoming);
       CAN.sendFrame(frame2);
       delayMicroseconds(100);
       sentFrames++;
@@ -74,6 +85,7 @@ static void test_1(void)
       counter++;
     }
     if (CAN2.rx_avail()) {
+      CAN2.get_rx_buff(incoming);
       CAN2.sendFrame(frame1);
       delayMicroseconds(100);
       sentFrames++;
