@@ -651,7 +651,7 @@ uint32_t CANRaw::mailbox_read(uint8_t uc_index, volatile CAN_FRAME *rxframe)
 
 	ul_id = m_pCan->CAN_MB[uc_index].CAN_MID;
 	if ((ul_id & CAN_MID_MIDE) == CAN_MID_MIDE) { //extended id
-		rxframe->id = ul_id & 0x3ffffu;
+		rxframe->id = ul_id & 0x1FFFFFFFu;
 		rxframe->extended = true;
 	}
 	else { //standard ID
