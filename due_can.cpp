@@ -216,8 +216,8 @@ void CANRaw::setNumTXBoxes(int txboxes) {
 	//Initialize TX boxen
 	for (c = 8 - numTXBoxes; c < 8; c++) {
 		mailbox_set_mode(c, CAN_MB_TX_MODE);
-		mailbox_set_priority(7, 10);
-		mailbox_set_accept_mask(7, 0x7FF, false);
+		mailbox_set_priority(c, 10);
+		mailbox_set_accept_mask(c, 0x7FF, false);
 	}
 }
 
@@ -729,7 +729,7 @@ void CANRaw::mailbox_set_mode(uint8_t uc_index, uint8_t mode) {
 
 uint8_t CANRaw::mailbox_get_mode(uint8_t uc_index) {
 	if (uc_index > CANMB_NUMBER-1) uc_index = CANMB_NUMBER-1;
-	return (uint8_t)((m_pCan->CAN_MB[uc_index].CAN_MMR & (~CAN_MMR_MOT_Msk)) >> CAN_MMR_MOT_Pos);
+	return (uint8_t)(m_pCan->CAN_MB[uc_index].CAN_MMR >> CAN_MMR_MOT_Pos) & 0x7;
 }
 
 void CANRaw::mailbox_set_databyte(uint8_t uc_index, uint8_t bytepos, uint8_t val)
