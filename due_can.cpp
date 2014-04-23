@@ -592,33 +592,32 @@ that you're going to use interrupt driven transmission - It forces it really.
 */
 void CANRaw::sendFrame(CAN_FRAME& txFrame) 
 {
-	bool foundTX = false;
-	for (int i = 0; i < 8; i++) {
-		if (((m_pCan->CAN_MB[i].CAN_MMR >> 24) & 7) == CAN_MB_TX_MODE)
-		{//is this mailbox set up as a TX box?
-			if (m_pCan->CAN_MB[i].CAN_MSR & CAN_MSR_MRDY) 
-			{//is it also available (not sending anything?)
-				foundTX = true;
-				mailbox_set_id(i, txFrame.id, txFrame.extended);
-				mailbox_set_datalen(i, txFrame.length);
-				mailbox_set_priority(i, txFrame.priority);
-				for (uint8_t cnt = 0; cnt < 8; cnt++)
-					mailbox_set_databyte(i, cnt, txFrame.data.bytes[cnt]);
-				enable_interrupt(0x01u << i); //enable the TX interrupt for this box
-				global_send_transfer_cmd((0x1u << i));
-				return; //we've sent it. mission accomplished.
-			}
-		}
+    for (int i = 0; i < 8; i++) {
+        if (((m_pCan->CAN_MB[i].CAN_MMR >> 24) & 7) == CAN_MB_TX_MODE)
+	{//is this mailbox set up as a TX box?
+	    if (m_pCan->CAN_MB[i].CAN_MSR & CAN_MSR_MRDY) 
+	    {//is it also available (not sending anything?)
+	        mailbox_set_id(i, txFrame.id, txFrame.extended);
+		mailbox_set_datalen(i, txFrame.length);
+		mailbox_set_priority(i, txFrame.priority);
+		for (uint8_t cnt = 0; cnt < 8; cnt++)
+		{    
+		    mailbox_set_databyte(i, cnt, txFrame.data.bytes[cnt]);
+		}       
+		enable_interrupt(0x01u << i); //enable the TX interrupt for this box
+		global_send_transfer_cmd((0x1u << i));
+		return; //we've sent it. mission accomplished.
+	    }
 	}
-	if (!foundTX) //there was no open TX boxes. Queue it.
-	{
-		tx_frame_buff[tx_buffer_tail].id = txFrame.id;
-		tx_frame_buff[tx_buffer_tail].extended = txFrame.extended;
-		tx_frame_buff[tx_buffer_tail].length = txFrame.length;
-		tx_frame_buff[tx_buffer_tail].data.value = txFrame.data.value;
-		tx_buffer_tail = (tx_buffer_tail + 1) % SIZE_TX_BUFFER;
-		return;
-	}
+    }
+	
+    //if execution got to this point then no free mailbox was found above
+    //so, queue the frame.
+    tx_frame_buff[tx_buffer_tail].id = txFrame.id;
+    tx_frame_buff[tx_buffer_tail].extended = txFrame.extended;
+    tx_frame_buff[tx_buffer_tail].length = txFrame.length;
+    tx_frame_buff[tx_buffer_tail].data.value = txFrame.data.value;
+    tx_buffer_tail = (tx_buffer_tail + 1) % SIZE_TX_BUFFER;	
 }
 
 
