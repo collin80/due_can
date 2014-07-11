@@ -177,6 +177,8 @@ class CANRaw
     // Constructor
     CANRaw( Can* pCan , uint32_t Rs, uint32_t En);
 
+	void (*cbCANFrame)(CAN_FRAME *);
+
     /**
  * \defgroup sam_driver_can_group Controller Area Network (CAN) Driver
  *

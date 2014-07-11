@@ -151,6 +151,8 @@ uint32_t CANRaw::init(uint32_t ul_baudrate)
 	uint32_t ul_flag;
 	uint32_t ul_tick;
 
+	cbCANFrame = 0;
+
 //arduino 1.5.2 doesn't init canbus so make sure to do it here. 
 #ifdef ARDUINO152
 	PIO_Configure(PIOA,PIO_PERIPH_A, PIO_PA1A_CANRX0|PIO_PA0A_CANTX0, PIO_DEFAULT);
@@ -977,6 +979,7 @@ void CANRaw::mailbox_int_handler(uint8_t mb, uint32_t ul_status) {
 		case 2: //receive w/ overwrite
 		case 4: //consumer - technically still a receive buffer
 		    mailbox_read(mb, &rx_frame_buff[rx_buffer_head]);
+			if (cbCANFrame) cbCANFrame((CAN_FRAME *)&rx_frame_buff[rx_buffer_head]);
 			rx_buffer_head = (rx_buffer_head + 1) % SIZE_RX_BUFFER;
 			break;
 		case 3: //transmit
