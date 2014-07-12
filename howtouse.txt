@@ -1,0 +1,118 @@
+The library has a ton of functions. A lot of them are complicated
+and really aren't necessary for normal use. This document
+explains how to use the library simply and will suffice for most
+applications.
+
+To start with, you'll need to initialize the canbus hardware. There are two
+canbus ports on the Due. There are objects already created
+for each port: CAN and CAN2. All functions below are called on one
+of those two objects.
+
+init(baudrate) - Initializes the given canbus port with the given baud
+rate. Sets up for interrupt driven canbus with 7 receive mailboxes
+and 1 transmit mailbox. You don't need to worry about mailboxes though
+if you don't want to.
+Example: CAN.init(250000);
+
+set_baudrate(baudrate) - Set the baud rate of the canbus. This
+can be set to anything you'd like (within reason) but the common
+baud rates are 33333, 125000, 250000, 500000, 1000000. Do not
+use this unless you are changing the baud rate of an already
+initialized canbus port.
+Example: CAN.set_baudrate(500000);
+
+enable() - Enable the canbus port. You don't need to call this unless
+you've disabled the port at some time in the past.
+Example: CAN.enable();
+
+disable() - Disable the canbus port. You will no longer be able to 
+properly use it.
+Example: CAN.disable();
+
+Then, it is on to using the newly set-up canbus port:
+
+This is the structure you will use for both sending and receiving.
+typedef struct
+{
+	uint32_t id;		// can be either 11 or 29 bit ID
+	uint32_t fid;        // Family ID is a somewhat advanced thing. You can ignore it.
+	uint8_t rtr;		// Remote Transmission Request - Don't use this.
+	uint8_t priority;	// Priority for TX frames. Probably not that useful normally
+	uint8_t extended;//Set to true for extended frames, false for standard
+	uint8_t length;	// Number of data bytes
+	uint8_t data[8];	// Data bytes
+} CAN_FRAME;
+
+int setRXFilter(id, mask, extended) - Set up a filter for incoming frames.
+This version of the function allows one to forget about mailboxes and just
+set a filter. It will handle the details for you and return which mailbox it used
+in case you need to change it later. It returns -1 if there was a problem.
+Example: CAN.setRXFilter(0x7E0, 0x7E0, false);
+
+int setRXFilter(mailbox,id,mask,extended) - The other version of setting a filter. 
+It takes the mailbox to change. So long as you pass a valid mailbox number (0-7)
+you will get that number back as the return value. It returns -1 on error.
+Example: CAN.setRXFilter(0, 0x10000, 0x10000, true);
+
+int findFreeRXMailbox() - Allows your program to get a free mailbox if you're 
+going to use the above function directly. You shouldn't need to use this very often.
+Example: mailbox = CAN.findFreeRXMailbox();
+
+setNumTXBoxes(txboxes) - Above it was mentioned that the default setup is to
+have 7 RX mailboxes and 1 TX mailbox. This should work for 95% of programs 
+because the underlying library code uses interrupts with large buffers. But, if you
+will only be sending or only receiving or if you otherwise really need to tweak the
+arrangement you can with this function. This function totally reinitializes all
+mailboxes so be sure to call this function before you start setting up your filters.
+Example: CAN.setNumTXBoxes(2);
+
+There are two ways to receive canbus frames with this library. You can choose from
+callback driven reception or buffered frames. Either one is interrupt driven. The
+choice really comes down to whether you'd like to process frames at a given point
+in your code or whether you'd like to immediately get a call when a frame comes in.
+
+Buffered / Polling version:
+
+bool rx_avail() - The actual frame reception code is interrupt driven so you do not
+need to rapidly poll for incoming frames at risk of losing some. However, it is still
+handy to know if one or more frames came in. This function returns true if there
+are received frames waiting to be processed by your program.
+Example: if (CAN.rx_avail()) //do something here.
+
+get_rx_buff(CAN_FRAME *) - Read a waiting frame into the variable passed to the function.
+Example: 
+CAN_FRAME myFrame;
+if (CAN.rx_avail()) get_rx_buff(&myFrame);
+
+Callback version:
+
+setCallback(mailbox, cb) - Set a callback function for a mailbox (0-7)
+Example:
+void someFunction(CAN_FRAME *frame)
+{
+//do something with frame in here
+}
+setCallback(3, someFunction); //sets callback for third mailbox
+
+setGeneralCallback(cb) - Set a callback that will be used for any mailbox that doesn't have a registered callback
+
+These calls will not require any polling at all. You will immediately be given any frames that come into the system.
+However, care must be taken as your callback function will be in interrupt context. Do not do very much work
+in the callback function. Any frame that was returned via callback will not be buffered and thus will not be available
+to the buffered system described previously.
+
+
+Frame sending:
+
+sendFrame(CAN_FRAME&) - Send a frame over canbus. It will try to send immediately
+but will automatically fall back to buffering the frame and sending via interrupt
+when the bus frees up.
+Example:
+CAN_FRAME myFrame;
+myFrame.id = 45;
+myFrame.length = 1
+myFrame.data[0] = 128;
+CAN.sendFrame(myFrame);
+
+
+
