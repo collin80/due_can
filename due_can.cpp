@@ -1090,18 +1090,20 @@ uint32_t CANRaw::getMailboxIer(int8_t mailbox) {
 * \param ul_status The status register of the canbus hardware
 */
 void CANRaw::mailbox_int_handler(uint8_t mb, uint32_t ul_status) {
+	CAN_FRAME tempFrame;
 	if (mb > 7) mb = 7;
 	if (m_pCan->CAN_MB[mb].CAN_MSR & CAN_MSR_MRDY) { //mailbox signals it is ready
 		switch(((m_pCan->CAN_MB[mb].CAN_MMR >> 24) & 7)) { //what sort of mailbox is it?
 		case 1: //receive
 		case 2: //receive w/ overwrite
 		case 4: //consumer - technically still a receive buffer
-			mailbox_read(mb, &rx_frame_buff[rx_buffer_head]); //still technically always use the buffer even for callback
+			mailbox_read(mb, &tempFrame);
 			//First, try to send a callback. If no callback registered then buffer the frame.
-			if (cbCANFrame[mb]) (*cbCANFrame[mb])((CAN_FRAME *)&rx_frame_buff[rx_buffer_head]);
-			else if (cbCANFrame[8]) (*cbCANFrame[8])((CAN_FRAME *)&rx_frame_buff[rx_buffer_head]);
+			if (cbCANFrame[mb]) (*cbCANFrame[mb])(&tempFrame);
+			else if (cbCANFrame[8]) (*cbCANFrame[8])(&tempFrame);
 			else 
 			{
+				memcpy((void *)&rx_frame_buff[rx_buffer_head], &tempFrame, sizeof(CAN_FRAME));
 				rx_buffer_head = (rx_buffer_head + 1) % SIZE_RX_BUFFER;
 			}
 			break;
