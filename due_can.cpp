@@ -151,7 +151,8 @@ uint32_t CANRaw::init(uint32_t ul_baudrate)
 	uint32_t ul_flag;
 	uint32_t ul_tick;
 
-	cbCANFrame = 0;
+	//initialize all function pointers to null
+	for (int i = 0; i < 9; i++) cbCANFrame[i] = 0;
 
 //arduino 1.5.2 doesn't init canbus so make sure to do it here. 
 #ifdef ARDUINO152
@@ -222,6 +223,19 @@ void CANRaw::setNumTXBoxes(int txboxes) {
 		mailbox_set_accept_mask(c, 0x7FF, false);
 	}
 }
+
+void CANRaw::setCallback(int mailbox, void (*cb)(CAN_FRAME *))
+{
+	if ((mailbox < 0) || (mailbox > 7)) return;
+	cbCANFrame[mailbox] = cb;
+}
+
+void CANRaw::setGeneralCallback(void (*cb)(CAN_FRAME *))
+{
+	cbCANFrame[8] = cb;
+}
+
+
 
 /**
  * \brief Enable CAN Controller.
@@ -979,7 +993,12 @@ void CANRaw::mailbox_int_handler(uint8_t mb, uint32_t ul_status) {
 		case 2: //receive w/ overwrite
 		case 4: //consumer - technically still a receive buffer
 		    mailbox_read(mb, &rx_frame_buff[rx_buffer_head]);
-			if (cbCANFrame) cbCANFrame((CAN_FRAME *)&rx_frame_buff[rx_buffer_head]);
+			//general outline for callbacks -> check to see if this mailbox has a registered callback.
+			//If it does then execute the callback. If it does not then check to see if there is a general
+			//callback. If there is, call it. If not, no callbacks are called and the frame is just buffered.
+			//It is worth noting that frames are *always* put in the buffer even if a callback is used.
+			if (cbCANFrame[mb]) (*cbCANFrame[mb])((CAN_FRAME *)&rx_frame_buff[rx_buffer_head]);
+			else if (cbCANFrame[8]) (*cbCANFrame[8])((CAN_FRAME *)&rx_frame_buff[rx_buffer_head]);
 			rx_buffer_head = (rx_buffer_head + 1) % SIZE_RX_BUFFER;
 			break;
 		case 3: //transmit
