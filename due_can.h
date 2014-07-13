@@ -171,11 +171,15 @@ class CANRaw
 	volatile uint16_t tx_buffer_head, tx_buffer_tail;
 	void mailbox_int_handler(uint8_t mb, uint32_t ul_status);
 
+	void (*cbCANFrame[9])(CAN_FRAME *); //8 mailboxes plus an optional catch all
+
   private:
 
   public:
     // Constructor
     CANRaw( Can* pCan , uint32_t Rs, uint32_t En);
+
+	
 
     /**
  * \defgroup sam_driver_can_group Controller Area Network (CAN) Driver
@@ -244,6 +248,8 @@ void mailbox_set_datalen(uint8_t uc_index, uint8_t dlen);
 void mailbox_set_datal(uint8_t uc_index, uint32_t val);
 void mailbox_set_datah(uint8_t uc_index, uint32_t val);
 void sendFrame(CAN_FRAME& txFrame);
+void setCallback(int mailbox, void (*cb)(CAN_FRAME *));
+void setGeneralCallback(void (*cb)(CAN_FRAME *));
 
 void reset_all_mailbox();
 void interruptHandler();

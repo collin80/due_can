@@ -151,6 +151,9 @@ uint32_t CANRaw::init(uint32_t ul_baudrate)
 	uint32_t ul_flag;
 	uint32_t ul_tick;
 
+	//initialize all function pointers to null
+	for (int i = 0; i < 9; i++) cbCANFrame[i] = 0;
+
 //arduino 1.5.2 doesn't init canbus so make sure to do it here. 
 #ifdef ARDUINO152
 	PIO_Configure(PIOA,PIO_PERIPH_A, PIO_PA1A_CANRX0|PIO_PA0A_CANTX0, PIO_DEFAULT);
@@ -199,6 +202,11 @@ uint32_t CANRaw::init(uint32_t ul_baudrate)
 	}
 }
 
+ /* \brief Initializes mailboxes to the requested mix of RX and TX boxes
+ *
+ * \param txboxes How many of the 8 boxes should be used for TX
+ *
+ */
 void CANRaw::setNumTXBoxes(int txboxes) {
 	int c;
 
@@ -219,6 +227,31 @@ void CANRaw::setNumTXBoxes(int txboxes) {
 		mailbox_set_priority(c, 10);
 		mailbox_set_accept_mask(c, 0x7FF, false);
 	}
+}
+
+/**
+ * \brief Set up a callback function for given mailbox
+ *
+ * \param mailbox Which mailbox (0-7) to assign callback to.
+ * \param cb A function pointer to a function with prototype "void functionname(CAN_FRAME *frame);"
+ *
+ */
+void CANRaw::setCallback(int mailbox, void (*cb)(CAN_FRAME *))
+{
+	if ((mailbox < 0) || (mailbox > 7)) return;
+	cbCANFrame[mailbox] = cb;
+}
+
+/**
+ * \brief Set up a general callback that will be used if no callback was registered for receiving mailbox
+ *
+ * \param cb A function pointer to a function with prototype "void functionname(CAN_FRAME *frame);"
+ *
+ * \note If this function is used to set up a callback then no buffering of frames will ever take place.
+ */
+void CANRaw::setGeneralCallback(void (*cb)(CAN_FRAME *))
+{
+	cbCANFrame[8] = cb;
 }
 
 /**
@@ -584,12 +617,15 @@ void CANRaw::reset_all_mailbox()
 	}
 }
 
-/*
-Does one of two things, either sends the given frame out on the first
-TX mailbox that's open or queues the frame for sending later via interrupts.
-This vastly simplifies the sending of frames - It does, however, assume
-that you're going to use interrupt driven transmission - It forces it really.
-*/
+/**
+ * \brief Send a frame out of this canbus port
+ *
+ * \param txFrame The filled out frame structure to use for sending
+ *
+ * \note Will do one of two things - 1. Sending the given frame out of the first available mailbox
+ * or 2. queue the frame for sending later via interrupt. Automatically turns on TX interrupt
+ * if necessary.
+ */
 void CANRaw::sendFrame(CAN_FRAME& txFrame) 
 {
     for (int i = 0; i < 8; i++) {
@@ -679,7 +715,14 @@ uint32_t CANRaw::mailbox_read(uint8_t uc_index, volatile CAN_FRAME *rxframe)
 	return ul_retval;
 }
 
-
+/**
+ * \brief Sets the ID portion of the given mailbox
+ *
+ * \param uc_index The mailbox to set (0-7)
+ * \param id The ID to set (11 or 29 bit)
+ * \param extended Boolean indicating if this ID should be designated as extended
+ *
+ */
 void CANRaw::mailbox_set_id(uint8_t uc_index, uint32_t id, bool extended) 
 {
 	if (uc_index > CANMB_NUMBER-1) uc_index = CANMB_NUMBER-1;
@@ -691,6 +734,14 @@ void CANRaw::mailbox_set_id(uint8_t uc_index, uint32_t id, bool extended)
 	}
 }
 
+/**
+ * \brief Get ID currently associated with a given mailbox
+ *
+ * \param uc_index The mailbox to get the ID from (0-7)
+ *
+ * \retval The ID associated with the mailbox
+ *
+ */
 uint32_t CANRaw::mailbox_get_id(uint8_t uc_index) {
 	if (uc_index > CANMB_NUMBER-1) uc_index = CANMB_NUMBER-1;
 	if (m_pCan->CAN_MB[uc_index].CAN_MID & CAN_MID_MIDE) {
@@ -701,12 +752,27 @@ uint32_t CANRaw::mailbox_get_id(uint8_t uc_index) {
 	}
 }
 
+/**
+ * \brief Set the transmission priority for given mailbox
+ *
+ * \param uc_index The mailbox to use
+ * \param pri The priority to set (0-15 in ascending priority)
+ *
+ */
 void CANRaw::mailbox_set_priority(uint8_t uc_index, uint8_t pri) 
 {
 	if (uc_index > CANMB_NUMBER-1) uc_index = CANMB_NUMBER-1;
 	m_pCan->CAN_MB[uc_index].CAN_MMR = (m_pCan->CAN_MB[uc_index].CAN_MMR & ~CAN_MMR_PRIOR_Msk) | (pri << CAN_MMR_PRIOR_Pos);
 }
 
+/**
+ * \brief Set mask for RX on the given mailbox
+ *
+ * \param uc_index The mailbox to use
+ * \param mask The mask to set
+ * \param ext Whether this should be an extended mask or not
+ *
+ */
 void CANRaw::mailbox_set_accept_mask(uint8_t uc_index, uint32_t mask, bool ext)
 {
 	if (uc_index > CANMB_NUMBER-1) uc_index = CANMB_NUMBER-1;
@@ -719,6 +785,15 @@ void CANRaw::mailbox_set_accept_mask(uint8_t uc_index, uint32_t mask, bool ext)
 	}
 }
 
+/**
+ * \brief Set the mode of the given mailbox
+ *
+ * \param uc_index Which mailbox to set (0-7)
+ * \param mode The mode to set mailbox to 
+ *
+ * \Note Modes: 0 = Disabled, 1 = RX, 2 = RX with overwrite
+ * 3 = TX, 4 = consumer 5 = producer
+ */
 void CANRaw::mailbox_set_mode(uint8_t uc_index, uint8_t mode) {
 	if (uc_index > CANMB_NUMBER-1) uc_index = CANMB_NUMBER-1;
 	if (mode > 5) mode = 0; //set disabled on invalid mode
@@ -726,11 +801,27 @@ void CANRaw::mailbox_set_mode(uint8_t uc_index, uint8_t mode) {
 		~CAN_MMR_MOT_Msk) | (mode << CAN_MMR_MOT_Pos);
 }
 
+/**
+ * \brief Get current mode of given mailbox
+ *
+ * \param uc_index Which mailbox to retrieve mode from (0-7)
+ *
+ * \retval Mode of mailbox
+ *
+ */
 uint8_t CANRaw::mailbox_get_mode(uint8_t uc_index) {
 	if (uc_index > CANMB_NUMBER-1) uc_index = CANMB_NUMBER-1;
 	return (uint8_t)(m_pCan->CAN_MB[uc_index].CAN_MMR >> CAN_MMR_MOT_Pos) & 0x7;
 }
 
+/**
+ * \brief Set value of one byte of data for mailbox
+ *
+ * \param uc_index Which mailbox (0-7)
+ * \param bytepos Which byte to set (0-7)
+ * \param val The byte value to set
+ *
+ */
 void CANRaw::mailbox_set_databyte(uint8_t uc_index, uint8_t bytepos, uint8_t val)
 {
 	uint8_t shift; //how many bits to shift
@@ -750,19 +841,39 @@ void CANRaw::mailbox_set_databyte(uint8_t uc_index, uint8_t bytepos, uint8_t val
 	}
 }
 
+/**
+ * \brief Set the lower 32 bits of the mailbox's data in one shot
+ *
+ * \param uc_index Which mailbox? (0-7)
+ * \param val The 32 bit value to use
+ *
+ */
 void CANRaw::mailbox_set_datal(uint8_t uc_index, uint32_t val)
 {
 	if (uc_index > CANMB_NUMBER-1) uc_index = CANMB_NUMBER-1;
 	m_pCan->CAN_MB[uc_index].CAN_MDL = val;
 }
 
+/**
+ * \brief Set the upper 32 bits of the mailbox's data in one shot
+ *
+ * \param uc_index Which mailbox? (0-7)
+ * \param val The 32 bit value to use
+ *
+ */
 void CANRaw::mailbox_set_datah(uint8_t uc_index, uint32_t val)
 {
 	if (uc_index > CANMB_NUMBER-1) uc_index = CANMB_NUMBER-1;
 	m_pCan->CAN_MB[uc_index].CAN_MDH = val;
 }
 
-
+/**
+ * \brief Set # of data bytes for given mailbox
+ *
+ * \param uc_index Which mailbox? (0-7)
+ * \param dlen The number of data bytes to use (0-8)
+ *
+ */
 void CANRaw::mailbox_set_datalen(uint8_t uc_index, uint8_t dlen)
 {
 	if (uc_index > CANMB_NUMBER-1) uc_index = CANMB_NUMBER-1;
@@ -771,12 +882,8 @@ void CANRaw::mailbox_set_datalen(uint8_t uc_index, uint8_t dlen)
 			~CAN_MCR_MDLC_Msk) | CAN_MCR_MDLC(dlen);
 }
 
-	/* Set the RTR bit in the sent frame. 
-	m_pCan->CAN_MB[uc_index].CAN_MCR |= CAN_MCR_MRTR;
-    */
-
 /**
- * \brief Require to send out a frame.
+ * \brief Command a mailbox to send the frame stored in it
  *
  * \param uc_index which mailbox to send frame. Load it up first
  *
@@ -813,11 +920,20 @@ CANRaw::CANRaw(Can* pCan, uint32_t Rs, uint32_t En ) {
 
 /**
 * \brief Check whether there are received canbus frames in the buffer
+*
+* \retval true if there are frames waiting in buffer, otherwise false
 */
 bool CANRaw::rx_avail() {
 	return (rx_buffer_head != rx_buffer_tail)?true:false;
 }
 
+/**
+ * \brief Retrieve a frame from the RX buffer
+ *
+ * \param buffer Reference to the frame structure to fill out
+ *
+ * \retval 0 no frames waiting to be received, 1 if a frame was returned
+ */
 uint32_t CANRaw::get_rx_buff(CAN_FRAME& buffer) {
 	if (rx_buffer_head == rx_buffer_tail) return 0;
 	buffer.id = rx_frame_buff[rx_buffer_tail].id;
@@ -922,11 +1038,14 @@ int CANRaw::setRXFilter(uint32_t id, uint32_t mask, bool extended) {
 }
 
 /**
-* \brief Set up an RX mailbox (given MB number) for the given parameters.
+* \brief Set up an RX mailbox (given MB number) filter
 *
-* \param pCan Which canbus hardware to use (CAN0 or CAN1)
-* \param Rs pin to use for transceiver Rs control
-* \param En pin to use for transceiver enable
+* \param mailbox Which mailbox to use (0-7)
+* \param id The ID to match against
+* \param mask The mask to apply before ID matching
+* \param extended Whether this should be extended mask or not
+*
+* \retval Mailbox number if successful or -1 on failure
 */
 int CANRaw::setRXFilter(uint8_t mailbox, uint32_t id, uint32_t mask, bool extended) {
 	if (mailbox > 7) return -1;
@@ -968,16 +1087,25 @@ uint32_t CANRaw::getMailboxIer(int8_t mailbox) {
 /**
 * \brief Handle a mailbox interrupt event
 * \param mb which mailbox generated this event
+* \param ul_status The status register of the canbus hardware
 */
 void CANRaw::mailbox_int_handler(uint8_t mb, uint32_t ul_status) {
+	CAN_FRAME tempFrame;
 	if (mb > 7) mb = 7;
 	if (m_pCan->CAN_MB[mb].CAN_MSR & CAN_MSR_MRDY) { //mailbox signals it is ready
 		switch(((m_pCan->CAN_MB[mb].CAN_MMR >> 24) & 7)) { //what sort of mailbox is it?
 		case 1: //receive
 		case 2: //receive w/ overwrite
 		case 4: //consumer - technically still a receive buffer
-		    mailbox_read(mb, &rx_frame_buff[rx_buffer_head]);
-			rx_buffer_head = (rx_buffer_head + 1) % SIZE_RX_BUFFER;
+			mailbox_read(mb, &tempFrame);
+			//First, try to send a callback. If no callback registered then buffer the frame.
+			if (cbCANFrame[mb]) (*cbCANFrame[mb])(&tempFrame);
+			else if (cbCANFrame[8]) (*cbCANFrame[8])(&tempFrame);
+			else 
+			{
+				memcpy((void *)&rx_frame_buff[rx_buffer_head], &tempFrame, sizeof(CAN_FRAME));
+				rx_buffer_head = (rx_buffer_head + 1) % SIZE_RX_BUFFER;
+			}
 			break;
 		case 3: //transmit
 			if (tx_buffer_head != tx_buffer_tail) 
@@ -1000,7 +1128,11 @@ void CANRaw::mailbox_int_handler(uint8_t mb, uint32_t ul_status) {
 	}
 }
 
-//Outside of object interrupt dispatcher. Needed because interrupt handlers can't really be members of a class
+/**
+ * \brief Interrupt dispatchers - Never directly call these
+ *
+ * \note These two functions needed because interrupt handlers cannot be part of a class
+ */
 void CAN0_Handler(void)
 {
 	CAN.interruptHandler();
