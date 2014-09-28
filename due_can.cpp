@@ -18,7 +18,6 @@
 
 
 #include "due_can.h"
-#include "sn65hvd234.h"
 
 /** Define the timemark mask. */
 #define TIMEMARK_MASK              0x0000ffff
@@ -163,9 +162,6 @@ uint32_t CANRaw::init(uint32_t ul_baudrate)
 	if (m_pCan == CAN0) pmc_enable_periph_clk(ID_CAN0);
 	if (m_pCan == CAN1) pmc_enable_periph_clk(ID_CAN1);
 
-	m_Transceiver->DisableLowPower();
-	m_Transceiver->Enable();
-
 	/* Initialize the baudrate for CAN module. */
 	ul_flag = set_baudrate(ul_baudrate);
 	if (ul_flag == 0) {
@@ -261,7 +257,6 @@ void CANRaw::setGeneralCallback(void (*cb)(CAN_FRAME *))
 void CANRaw::enable()
 {
 	m_pCan->CAN_MR |= CAN_MR_CANEN;
-	m_Transceiver->Enable();
 }
 
 /**
@@ -271,10 +266,6 @@ void CANRaw::enable()
 void CANRaw::disable()
 {
 	m_pCan->CAN_MR &= ~CAN_MR_CANEN;
-
-	m_Transceiver->EnableLowPower();
-    m_Transceiver->Disable();
-
 }
 
 /**
@@ -913,9 +904,8 @@ uint32_t CANRaw::mailbox_tx_frame(uint8_t uc_index)
 * \param Rs pin to use for transceiver Rs control
 * \param En pin to use for transceiver enable
 */
-CANRaw::CANRaw(Can* pCan, uint32_t Rs, uint32_t En ) {
+CANRaw::CANRaw(Can* pCan) {
 	m_pCan = pCan;
-	m_Transceiver = new SSN65HVD234(Rs, En);
 }
 
 /**
@@ -1143,6 +1133,6 @@ void CAN1_Handler(void)
 }
 
 /// instantiate the two canbus adapters
-CANRaw CAN(CAN0, CAN0_RS, CAN0_EN);
-CANRaw CAN2(CAN1, CAN1_RS, CAN1_EN);
+CANRaw CAN(CAN0);
+CANRaw CAN2(CAN1);
 

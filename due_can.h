@@ -69,7 +69,7 @@ typedef struct {
 #ifndef _CAN_LIBRARY_
 #define _CAN_LIBRARY_
 
-#include "sn65hvd234.h"
+#include "arduino.h"
 
 //add some extra stuff that is needed for Arduino 1.5.2
 #ifndef PINS_CAN0
@@ -82,13 +82,6 @@ typedef struct {
 	#define PINS_CAN1            (91u)
 	#define ARDUINO152
 #endif
-
-	  
-
-#define CAN0_RS  61
-#define CAN0_EN  62
-#define CAN1_RS  63
-#define CAN1_EN  65
 
 /** Define the Mailbox mask for eight mailboxes. */
 #define GLOBAL_MAILBOX_MASK           0x000000ff
@@ -159,9 +152,6 @@ class CANRaw
     /* CAN peripheral, set by constructor */
     Can* m_pCan ;
 
-    /* CAN Transceiver */
-    SSN65HVD234* m_Transceiver;
-
 	int numTXBoxes; //There are 8 mailboxes, anything not TX will be set RX
 
 	volatile CAN_FRAME rx_frame_buff[SIZE_RX_BUFFER];
@@ -177,7 +167,7 @@ class CANRaw
 
   public:
     // Constructor
-    CANRaw( Can* pCan , uint32_t Rs, uint32_t En);
+    CANRaw( Can* pCan);
 
 	
 
