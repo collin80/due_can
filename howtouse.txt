@@ -115,21 +115,4 @@ myFrame.data[0] = 128;
 CAN.sendFrame(myFrame);
 
 
-Note:
-
-All control of the tranceiver has been removed from the library.
-A library such as this should not be hard coded to use a specific transceiver
-as your choice of transceiver should not affect the library at all. As such,
-if you had previously used an SN65HVD234 and were relying on this library
-to enable the transceiver for you then you will need to do it yourself now.
-The previously used pins are below:
-
-#define CAN0_RS  61
-#define CAN0_EN  62
-#define CAN1_RS  63
-#define CAN1_EN  65
-
-So, for instance, if you need to enable the transceiver for CAN0 you'd
-output_high(62);
-
 
