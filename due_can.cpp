@@ -101,20 +101,20 @@ uint32_t CANRaw::set_baudrate(uint32_t ul_baudrate)
 }
 
 
-void CANRaw::begin()
+uint32_t CANRaw::begin()
 {
-	init(CAN_DEFAULT_BAUD);
+	return init(CAN_DEFAULT_BAUD);
 }
 
-void CANRaw::begin(uint32_t baudrate) 
+uint32_t CANRaw::begin(uint32_t baudrate) 
 {
-	init(baudrate);
+	return init(baudrate);
 }
 
-void CANRaw::begin(uint32_t baudrate, uint8_t enablePin) 
+uint32_t CANRaw::begin(uint32_t baudrate, uint8_t enablePin) 
 {
 	this->enablePin = enablePin;
-	init(baudrate);
+	return init(baudrate);
 }
 
 
@@ -145,8 +145,10 @@ uint32_t CANRaw::init(uint32_t ul_baudrate)
 	if (m_pCan == CAN0) pmc_enable_periph_clk(ID_CAN0);
 	if (m_pCan == CAN1) pmc_enable_periph_clk(ID_CAN1);
 
-	pinMode(enablePin, OUTPUT);
-	digitalWrite(enablePin, HIGH);
+	if (enablePin != 255) {
+		pinMode(enablePin, OUTPUT);
+		digitalWrite(enablePin, HIGH);
+	}
 
 	/* Initialize the baudrate for CAN module. */
 	ul_flag = set_baudrate(ul_baudrate);
@@ -260,7 +262,7 @@ void CANRaw::detachCANInterrupt(uint8_t mailBox)
 void CANRaw::enable()
 {
 	m_pCan->CAN_MR |= CAN_MR_CANEN;
-	digitalWrite(enablePin, HIGH);
+	if (enablePin != 255) digitalWrite(enablePin, HIGH);
 }
 
 /**
@@ -270,7 +272,7 @@ void CANRaw::enable()
 void CANRaw::disable()
 {
 	m_pCan->CAN_MR &= ~CAN_MR_CANEN;
-	digitalWrite(enablePin, LOW);
+	if (enablePin != 255) digitalWrite(enablePin, LOW);
 }
 
 /**

@@ -196,9 +196,9 @@ class CANRaw
 	uint32_t set_baudrate(uint32_t ul_baudrate);
 
 	uint32_t init(uint32_t ul_baudrate);
-	void begin();
-	void begin(uint32_t baudrate);
-	void begin(uint32_t baudrate, uint8_t enablePin);
+	uint32_t begin();
+	uint32_t begin(uint32_t baudrate);
+	uint32_t begin(uint32_t baudrate, uint8_t enablePin);
 
 	void enable();
 	void disable();
