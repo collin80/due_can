@@ -16,60 +16,10 @@
   Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
-/* Reference for how this struct is defined:
-This is from can.h from the libsam files
-typedef struct {
-	uint32_t ul_mb_idx;
-	uint8_t uc_obj_type;  //! Mailbox object type, one of the six different objects.
-	uint8_t uc_id_ver;    //! 0 stands for standard frame, 1 stands for extended frame.
-	uint8_t uc_length;    //! Received data length or transmitted data length.
-	uint8_t uc_tx_prio;   //! Mailbox priority, no effect in receive mode.
-	uint32_t ul_status;   //! Mailbox status register value.
-	uint32_t ul_id_msk;   //! No effect in transmit mode.
-	uint32_t ul_id;       //! Received frame ID or the frame ID to be transmitted.
-	uint32_t ul_fid;      //! Family ID.
-	uint32_t ul_datal;
-	uint32_t ul_datah;
-} can_mb_conf_t;
-These are from component_can.h in the CMSIS files
-typedef struct {
-  RwReg  CAN_MMR;       // (CanMb Offset: 0x0) Mailbox Mode Register
-  RwReg  CAN_MAM;       // (CanMb Offset: 0x4) Mailbox Acceptance Mask Register
-  RwReg  CAN_MID;       /**< \brief (CanMb Offset: 0x8) Mailbox ID Register 
-  RwReg  CAN_MFID;      /**< \brief (CanMb Offset: 0xC) Mailbox Family ID Register
-  RwReg  CAN_MSR;       /**< \brief (CanMb Offset: 0x10) Mailbox Status Register 
-  RwReg  CAN_MDL;       /**< \brief (CanMb Offset: 0x14) Mailbox Data Low Register 
-  RwReg  CAN_MDH;       /**< \brief (CanMb Offset: 0x18) Mailbox Data High Register 
-  RwReg  CAN_MCR;       /**< \brief (CanMb Offset: 0x1C) Mailbox Control Register 
-} CanMb;
-/** \brief Can hardware registers
-#define CANMB_NUMBER 8
-typedef struct {
-  RwReg  CAN_MR;        /**< \brief (Can Offset: 0x0000) Mode Register 
-  WoReg  CAN_IER;       /**< \brief (Can Offset: 0x0004) Interrupt Enable Register 
-  WoReg  CAN_IDR;       /**< \brief (Can Offset: 0x0008) Interrupt Disable Register 
-  RoReg  CAN_IMR;       /**< \brief (Can Offset: 0x000C) Interrupt Mask Register 
-  RoReg  CAN_SR;        /**< \brief (Can Offset: 0x0010) Status Register 
-  RwReg  CAN_BR;        /**< \brief (Can Offset: 0x0014) Baudrate Register 
-  RoReg  CAN_TIM;       /**< \brief (Can Offset: 0x0018) Timer Register 
-  RoReg  CAN_TIMESTP;   /**< \brief (Can Offset: 0x001C) Timestamp Register 
-  RoReg  CAN_ECR;       /**< \brief (Can Offset: 0x0020) Error Counter Register 
-  WoReg  CAN_TCR;       /**< \brief (Can Offset: 0x0024) Transfer Command Register 
-  WoReg  CAN_ACR;       /**< \brief (Can Offset: 0x0028) Abort Command Register 
-  RoReg  Reserved1[46];
-  RwReg  CAN_WPMR;      /**< \brief (Can Offset: 0x00E4) Write Protect Mode Register 
-  RoReg  CAN_WPSR;      /**< \brief (Can Offset: 0x00E8) Write Protect Status Register 
-  RoReg  Reserved2[69];
-  CanMb  CAN_MB[CANMB_NUMBER]; /**< \brief (Can Offset: 0x200) MB = 0 .. 7 
-} Can;
-*/
-
-
-
 #ifndef _CAN_LIBRARY_
 #define _CAN_LIBRARY_
 
-#include "sn65hvd234.h"
+#include "arduino.h"
 
 //add some extra stuff that is needed for Arduino 1.5.2
 #ifndef PINS_CAN0
@@ -83,11 +33,10 @@ typedef struct {
 	#define ARDUINO152
 #endif
 
-	  
+#define CAN		Can0
+#define CAN2	Can1
 
-#define CAN0_RS  61
 #define CAN0_EN  62
-#define CAN1_RS  63
 #define CAN1_EN  65
 
 /** Define the Mailbox mask for eight mailboxes. */
@@ -108,6 +57,8 @@ typedef struct {
 #define CAN_BPS_10K                   10000
 #define CAN_BPS_5K                    5000
 
+#define CAN_DEFAULT_BAUD	CAN_BPS_250K
+
 /** Define the mailbox mode. */
 #define CAN_MB_DISABLE_MODE           0
 #define CAN_MB_RX_MODE                1
@@ -125,6 +76,55 @@ typedef struct {
 #define SIZE_RX_BUFFER	32 //RX incoming ring buffer is this big
 #define SIZE_TX_BUFFER	16 //TX ring buffer is this big
 
+	/** Define the timemark mask. */
+#define TIMEMARK_MASK              0x0000ffff
+
+/* CAN timeout for synchronization. */
+#define CAN_TIMEOUT                100000
+
+/** The max value for CAN baudrate prescale. */
+#define CAN_BAUDRATE_MAX_DIV       128
+
+/** Define the scope for TQ. */
+#define CAN_MIN_TQ_NUM             8
+#define CAN_MAX_TQ_NUM             25
+
+/** Define the fixed bit time value. */
+#define CAN_BIT_SYNC               1
+#define CAN_BIT_IPT                2
+
+typedef struct {
+	uint8_t uc_tq;      //! CAN_BIT_SYNC + uc_prog + uc_phase1 + uc_phase2 = uc_tq, 8 <= uc_tq <= 25.
+	uint8_t uc_prog;    //! Propagation segment, (3-bits + 1), 1~8;
+	uint8_t uc_phase1;  //! Phase segment 1, (3-bits + 1), 1~8;
+	uint8_t uc_phase2;  //! Phase segment 2, (3-bits + 1), 1~8, CAN_BIT_IPT <= uc_phase2;
+	uint8_t uc_sjw;     //! Resynchronization jump width, (2-bits + 1), min(uc_phase1, 4);
+	uint8_t uc_sp;      //! Sample point value, 0~100 in percent.
+} can_bit_timing_t;
+
+
+/** Values of bit time register for different baudrates, Sample point = ((1 + uc_prog + uc_phase1) / uc_tq) * 100%. */
+const can_bit_timing_t can_bit_time[] = {
+	{8,   (2 + 1), (1 + 1), (1 + 1), (2 + 1), 75},
+	{9,   (1 + 1), (2 + 1), (2 + 1), (1 + 1), 67},
+	{10,  (2 + 1), (2 + 1), (2 + 1), (2 + 1), 70},
+	{11,  (3 + 1), (2 + 1), (2 + 1), (3 + 1), 72},
+	{12,  (2 + 1), (3 + 1), (3 + 1), (3 + 1), 67},
+	{13,  (3 + 1), (3 + 1), (3 + 1), (3 + 1), 77},
+	{14,  (3 + 1), (3 + 1), (4 + 1), (3 + 1), 64},
+	{15,  (3 + 1), (4 + 1), (4 + 1), (3 + 1), 67},
+	{16,  (4 + 1), (4 + 1), (4 + 1), (3 + 1), 69},
+	{17,  (5 + 1), (4 + 1), (4 + 1), (3 + 1), 71},
+	{18,  (4 + 1), (5 + 1), (5 + 1), (3 + 1), 67},
+	{19,  (5 + 1), (5 + 1), (5 + 1), (3 + 1), 68},
+	{20,  (6 + 1), (5 + 1), (5 + 1), (3 + 1), 70},
+	{21,  (7 + 1), (5 + 1), (5 + 1), (3 + 1), 71},
+	{22,  (6 + 1), (6 + 1), (6 + 1), (3 + 1), 68},
+	{23,  (7 + 1), (7 + 1), (6 + 1), (3 + 1), 70},
+	{24,  (6 + 1), (7 + 1), (7 + 1), (3 + 1), 67},
+	{25,  (7 + 1), (7 + 1), (7 + 1), (3 + 1), 68}
+};
+
 //This is architecture specific. DO NOT USE THIS UNION ON ANYTHING OTHER THAN THE CORTEX M3 / Arduino Due
 //UNLESS YOU DOUBLE CHECK THINGS!
 typedef union {
@@ -140,6 +140,7 @@ typedef union {
 		uint16_t s3;
     };
 	uint8_t bytes[8];
+	uint8_t byte[8]; //alternate name so you can omit the s if you feel it makes more sense
 } BytesUnion;
 
 typedef struct
@@ -156,13 +157,11 @@ typedef struct
 class CANRaw
 {
   protected:
-    /* CAN peripheral, set by constructor */
-    Can* m_pCan ;
-
-    /* CAN Transceiver */
-    SSN65HVD234* m_Transceiver;
-
 	int numTXBoxes; //There are 8 mailboxes, anything not TX will be set RX
+
+  private:
+	/* CAN peripheral, set by constructor */
+	Can* m_pCan ;
 
 	volatile CAN_FRAME rx_frame_buff[SIZE_RX_BUFFER];
 	volatile CAN_FRAME tx_frame_buff[SIZE_TX_BUFFER];
@@ -171,93 +170,101 @@ class CANRaw
 	volatile uint16_t tx_buffer_head, tx_buffer_tail;
 	void mailbox_int_handler(uint8_t mb, uint32_t ul_status);
 
+	uint8_t enablePin;
+	uint32_t write_id; //public storage for an id. Will be used by the write function to set which ID to send to.
+	bool bigEndian;
+
 	void (*cbCANFrame[9])(CAN_FRAME *); //8 mailboxes plus an optional catch all
 
-  private:
-
   public:
+
     // Constructor
-    CANRaw( Can* pCan , uint32_t Rs, uint32_t En);
+    CANRaw( Can* pCan, uint32_t En);
 
-	
+	int setRXFilter(uint32_t id, uint32_t mask, bool extended);
+	int setRXFilter(uint8_t mailbox, uint32_t id, uint32_t mask, bool extended);
+	int watchFor(); //allow anything through
+	int watchFor(uint32_t id); //allow just this ID through (automatic determination of extended status)
+	int watchFor(uint32_t id, uint32_t mask); //allow a range of ids through
+	int watchForRange(uint32_t id1, uint32_t id2); //try to allow the range from id1 to id2 - automatically determine base ID and mask
 
-    /**
- * \defgroup sam_driver_can_group Controller Area Network (CAN) Driver
- *
- * See \ref sam_can_quickstart.
- *
- * \par Purpose
- *
- * The CAN controller provides all the features required to implement
- * the serial communication protocol CAN defined by Robert Bosch GmbH,
- * the CAN specification. This is a driver for configuration, enabling,
- * disabling and use of the CAN peripheral.
- *
- * @{
- */
+	void setNumTXBoxes(int txboxes);
+	int findFreeRXMailbox();
+	uint8_t mailbox_get_mode(uint8_t uc_index);
+	uint32_t mailbox_get_id(uint8_t uc_index);
+	uint32_t getMailboxIer(int8_t mailbox);
+	uint32_t set_baudrate(uint32_t ul_baudrate);
 
-int setRXFilter(uint32_t id, uint32_t mask, bool extended);
-int setRXFilter(uint8_t mailbox, uint32_t id, uint32_t mask, bool extended);
-void setNumTXBoxes(int txboxes);
-int findFreeRXMailbox();
-uint8_t mailbox_get_mode(uint8_t uc_index);
-uint32_t mailbox_get_id(uint8_t uc_index);
-uint32_t getMailboxIer(int8_t mailbox);
-uint32_t set_baudrate(uint32_t ul_baudrate);
-uint32_t init(uint32_t ul_baudrate);
-void enable();
-void disable();
-void disable_low_power_mode();
-void enable_low_power_mode();
-void disable_autobaud_listen_mode();
-void enable_autobaud_listen_mode();
-void disable_overload_frame();
-void enable_overload_frame();
-void set_timestamp_capture_point(uint32_t ul_flag);
-void disable_time_triggered_mode();
-void enable_time_triggered_mode();
-void disable_timer_freeze();
-void enable_timer_freeze();
-void disable_tx_repeat();
-void enable_tx_repeat();
-void set_rx_sync_stage(uint32_t ul_stage);
-void enable_interrupt(uint32_t dw_mask);
-void disable_interrupt(uint32_t dw_mask);
-uint32_t get_interrupt_mask();
-uint32_t get_status();
-uint32_t get_internal_timer_value();
-uint32_t get_timestamp_value();
-uint8_t get_tx_error_cnt();
-uint8_t get_rx_error_cnt();
-void reset_internal_timer();
-void global_send_transfer_cmd(uint8_t uc_mask);
-void global_send_abort_cmd(uint8_t uc_mask);
-void mailbox_set_timemark(uint8_t uc_index, uint16_t us_cnt);
-uint32_t mailbox_get_status(uint8_t uc_index);
-void mailbox_send_transfer_cmd(uint8_t uc_index);
-void mailbox_send_abort_cmd(uint8_t uc_index);
-void mailbox_init(uint8_t uc_index);
-uint32_t mailbox_read(uint8_t uc_index, volatile CAN_FRAME *rxframe);
-uint32_t mailbox_tx_frame(uint8_t uc_index);
-void mailbox_set_id(uint8_t uc_index, uint32_t id, bool extended);
-void mailbox_set_priority(uint8_t uc_index, uint8_t pri);
-void mailbox_set_accept_mask(uint8_t uc_index, uint32_t mask, bool ext);
-void mailbox_set_mode(uint8_t uc_index, uint8_t mode);
-void mailbox_set_databyte(uint8_t uc_index, uint8_t bytepos, uint8_t val);
-void mailbox_set_datalen(uint8_t uc_index, uint8_t dlen);
-void mailbox_set_datal(uint8_t uc_index, uint32_t val);
-void mailbox_set_datah(uint8_t uc_index, uint32_t val);
-void sendFrame(CAN_FRAME& txFrame);
-void setCallback(int mailbox, void (*cb)(CAN_FRAME *));
-void setGeneralCallback(void (*cb)(CAN_FRAME *));
+	uint32_t init(uint32_t ul_baudrate);
+	void begin();
+	void begin(uint32_t baudrate);
+	void begin(uint32_t baudrate, uint8_t enablePin);
 
-void reset_all_mailbox();
-void interruptHandler();
-bool rx_avail();
-uint32_t get_rx_buff(CAN_FRAME &);
+	void enable();
+	void disable();
+	void disable_low_power_mode();
+	void enable_low_power_mode();
+	void disable_autobaud_listen_mode();
+	void enable_autobaud_listen_mode();
+	void disable_overload_frame();
+	void enable_overload_frame();
+	void set_timestamp_capture_point(uint32_t ul_flag);
+	void disable_time_triggered_mode();
+	void enable_time_triggered_mode();
+	void disable_timer_freeze();
+	void enable_timer_freeze();
+	void disable_tx_repeat();
+	void enable_tx_repeat();
+	void set_rx_sync_stage(uint32_t ul_stage);
+	void enable_interrupt(uint32_t dw_mask);
+	void disable_interrupt(uint32_t dw_mask);
+	uint32_t get_interrupt_mask();
+	uint32_t get_status();
+	uint32_t get_internal_timer_value();
+	uint32_t get_timestamp_value();
+	uint8_t get_tx_error_cnt();
+	uint8_t get_rx_error_cnt();
+	void reset_internal_timer();
+	void global_send_transfer_cmd(uint8_t uc_mask);
+	void global_send_abort_cmd(uint8_t uc_mask);
+	void mailbox_set_timemark(uint8_t uc_index, uint16_t us_cnt);
+	uint32_t mailbox_get_status(uint8_t uc_index);
+	void mailbox_send_transfer_cmd(uint8_t uc_index);
+	void mailbox_send_abort_cmd(uint8_t uc_index);
+	void mailbox_init(uint8_t uc_index);
+	uint32_t mailbox_read(uint8_t uc_index, volatile CAN_FRAME *rxframe);
+	uint32_t mailbox_tx_frame(uint8_t uc_index);
+	void mailbox_set_id(uint8_t uc_index, uint32_t id, bool extended);
+	void mailbox_set_priority(uint8_t uc_index, uint8_t pri);
+	void mailbox_set_accept_mask(uint8_t uc_index, uint32_t mask, bool ext);
+	void mailbox_set_mode(uint8_t uc_index, uint8_t mode);
+	void mailbox_set_databyte(uint8_t uc_index, uint8_t bytepos, uint8_t val);
+	void mailbox_set_datalen(uint8_t uc_index, uint8_t dlen);
+	void mailbox_set_datal(uint8_t uc_index, uint32_t val);
+	void mailbox_set_datah(uint8_t uc_index, uint32_t val);
+
+	void sendFrame(CAN_FRAME& txFrame);
+	void setWriteID(uint32_t id);
+	template <typename t> void write(t inputValue); //write a variable # of bytes out in a frame. Uses id as the ID.
+	void setBigEndian(bool);
+
+	void setCallback(int mailbox, void (*cb)(CAN_FRAME *));
+	void setGeneralCallback(void (*cb)(CAN_FRAME *));
+	//note that these below versions still use mailbox number. There isn't a good way around this. 
+	void attachCANInterrupt(void (*cb)(CAN_FRAME *)); //alternative callname for setGeneralCallback
+	void attachCANInterrupt(uint8_t mailBox, void (*cb)(CAN_FRAME *));
+	void detachCANInterrupt(uint8_t mailBox);
+
+	void reset_all_mailbox();
+	void interruptHandler();
+	bool rx_avail();
+	int available(); //like rx_avail but returns the number of waiting frames
+
+	uint32_t get_rx_buff(CAN_FRAME &);
+	uint32_t read(CAN_FRAME &);
 };
 
-extern CANRaw CAN;
-extern CANRaw CAN2;
+extern CANRaw Can0;
+extern CANRaw Can1;
 
 #endif // _CAN_LIBRARY_
