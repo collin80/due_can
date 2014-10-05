@@ -1104,15 +1104,12 @@ int CANRaw::setRXFilter(uint8_t mailbox, uint32_t id, uint32_t mask, bool extend
 //quickly sets things up for all in. But, it's perfect for the novice getting started.
 int CANRaw::watchFor() 
 {
-	mailbox_set_accept_mask(0, 0, false);
-	mailbox_set_id(0, 0, false);
+	int retVal = setRXFilter(0, 0, false);
 	enable_interrupt(getMailboxIer(0));
-
-	mailbox_set_accept_mask(1, 0, true);
-	mailbox_set_id(1, 0, true);
+	setRXFilter(0, 0, true);
 	enable_interrupt(getMailboxIer(1));
 
-	return 0;
+	return retVal;
 }
 
 //Let a single frame ID through. Automatic determination of extended. Also automatically sets mask
@@ -1149,8 +1146,8 @@ int CANRaw::watchForRange(uint32_t id1, uint32_t id2)
 	if (id2 <= 0x7FF) mask = 0x7FF;
 	else mask = 0x1FFFFFFF;
 
-	/* Yes, the below loop looks a bit odd. Here is a quick overview of the theory
-	   behind these calculations. We start with mask set to 11 or 29 set bits (all 1's)
+	/* Here is a quick overview of the theory behind these calculations.
+	   We start with mask set to 11 or 29 set bits (all 1's)
 	   and id set to the lowest ID in the range.
 	   From there we go through every single ID possible in the range. For each ID
 	   we AND with the current ID. At the end only bits that never changed and were 1's
