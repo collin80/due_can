@@ -1,9 +1,12 @@
 ###classes, datatypes, C++ keywords
-RX_CAN_FRAME	KEYWORD1
-TX_CAN_FRAME	KEYWORD1
-
+CAN_FRAME	KEYWORD1
 
 ###functions and methods
+setRXFilter	KEYWORD2
+watchFor	KEYWORD2
+watchForRange KEYWORD2
+setNumTXBoxes	KEYWORD2
+begin	KEYWORD2
 set_baudrate	KEYWORD2
 init	KEYWORD2
 enable	KEYWORD2
@@ -51,10 +54,22 @@ mailbox_set_datah	KEYWORD2
 reset_all_mailbox	KEYWORD2
 rx_avail	KEYWORD2
 get_rx_buff	KEYWORD2
+sendFrame	KEYWORD2
+setWriteID	KEYWORD2
+write	KEYWORD2
+setBigEndian	KEYWORD2
+setCallBack	KEYWORD2
+setGeneralCallback	KEYWORD2
+attachCANInterrupt	KEYWORD2
+detachCANInterrupt	KEYWORD2
+available	KEYWORD2
+read	KEYWORD2
 
 ###setup and loop functions, also serial
 CAN	KEYWORD3
 CAN2	KEYWORD3
+Can0	KEYWORD3
+Can1	KEYWORD3
 
 
 ###Constants

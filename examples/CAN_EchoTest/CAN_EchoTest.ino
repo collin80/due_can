@@ -42,12 +42,13 @@ void loop(){
   }
 
   // Initialize CAN0 and CAN1, baudrate is 250kb/s
-  CAN.init(CAN_BPS_250K);
-  CAN2.init(CAN_BPS_250K);
+  Can0.begin(CAN_BPS_250K);
+  Can1.begin(CAN_BPS_250K);
 
-  //Set a filter for CAN2 such that only frames that exactly match 
-  //TEST1_CAN_TRANSFER_ID can get through
-  CAN2.setRXFilter(0, TEST1_CAN_TRANSFER_ID, 0x7FF, false);
+  //The default is to allow nothing through if nothing is specified
+  
+  //only allow this one frame ID through. 
+  Can1.watchFor(TEST1_CAN_TRANSFER_ID);
 
   // Prepare transmit ID, data and data length in CAN0 mailbox 0
   output.id = TEST1_CAN_TRANSFER_ID;
@@ -60,23 +61,23 @@ void loop(){
   //sending when there is an opening.
   CAN.sendFrame(output);
 
-  // Wait for CAN1 mailbox 0 to receive the data
-  while (!CAN2.rx_avail()) {
+  // Wait for second canbus port to receive the frame
+  while (Can1.available() == 0) {
   }
 
   // Read the received data from CAN1 mailbox 0
   CAN_FRAME incoming;
-  CAN2.get_rx_buff(incoming);
+  Can1.read(incoming);
   
   Serial.print("CAN message received= ");
   Serial.print(incoming.data.low, HEX);
   Serial.print(incoming.data.high, HEX);
   
   // Disable CAN0 Controller
-  CAN.disable();
+  Can0.disable();
 
   // Disable CAN1 Controller
-  CAN2.disable();
+  Can1.disable();
 
   Serial.print("\nEnd of test");
 

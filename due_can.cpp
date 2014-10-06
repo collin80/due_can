@@ -18,56 +18,20 @@
 
 
 #include "due_can.h"
-#include "sn65hvd234.h"
-
-/** Define the timemark mask. */
-#define TIMEMARK_MASK              0x0000ffff
-
-/* CAN timeout for synchronization. */
-#define CAN_TIMEOUT                100000
-
-/** The max value for CAN baudrate prescale. */
-#define CAN_BAUDRATE_MAX_DIV       128
-
-/** Define the scope for TQ. */
-#define CAN_MIN_TQ_NUM             8
-#define CAN_MAX_TQ_NUM             25
-
-/** Define the fixed bit time value. */
-#define CAN_BIT_SYNC               1
-#define CAN_BIT_IPT                2
-
-typedef struct {
-	uint8_t uc_tq;      //! CAN_BIT_SYNC + uc_prog + uc_phase1 + uc_phase2 = uc_tq, 8 <= uc_tq <= 25.
-	uint8_t uc_prog;    //! Propagation segment, (3-bits + 1), 1~8;
-	uint8_t uc_phase1;  //! Phase segment 1, (3-bits + 1), 1~8;
-	uint8_t uc_phase2;  //! Phase segment 2, (3-bits + 1), 1~8, CAN_BIT_IPT <= uc_phase2;
-	uint8_t uc_sjw;     //! Resynchronization jump width, (2-bits + 1), min(uc_phase1, 4);
-	uint8_t uc_sp;      //! Sample point value, 0~100 in percent.
-} can_bit_timing_t;
 
 
-/** Values of bit time register for different baudrates, Sample point = ((1 + uc_prog + uc_phase1) / uc_tq) * 100%. */
-const can_bit_timing_t can_bit_time[] = {
-	{8,   (2 + 1), (1 + 1), (1 + 1), (2 + 1), 75},
-	{9,   (1 + 1), (2 + 1), (2 + 1), (1 + 1), 67},
-	{10,  (2 + 1), (2 + 1), (2 + 1), (2 + 1), 70},
-	{11,  (3 + 1), (2 + 1), (2 + 1), (3 + 1), 72},
-	{12,  (2 + 1), (3 + 1), (3 + 1), (3 + 1), 67},
-	{13,  (3 + 1), (3 + 1), (3 + 1), (3 + 1), 77},
-	{14,  (3 + 1), (3 + 1), (4 + 1), (3 + 1), 64},
-	{15,  (3 + 1), (4 + 1), (4 + 1), (3 + 1), 67},
-	{16,  (4 + 1), (4 + 1), (4 + 1), (3 + 1), 69},
-	{17,  (5 + 1), (4 + 1), (4 + 1), (3 + 1), 71},
-	{18,  (4 + 1), (5 + 1), (5 + 1), (3 + 1), 67},
-	{19,  (5 + 1), (5 + 1), (5 + 1), (3 + 1), 68},
-	{20,  (6 + 1), (5 + 1), (5 + 1), (3 + 1), 70},
-	{21,  (7 + 1), (5 + 1), (5 + 1), (3 + 1), 71},
-	{22,  (6 + 1), (6 + 1), (6 + 1), (3 + 1), 68},
-	{23,  (7 + 1), (7 + 1), (6 + 1), (3 + 1), 70},
-	{24,  (6 + 1), (7 + 1), (7 + 1), (3 + 1), 67},
-	{25,  (7 + 1), (7 + 1), (7 + 1), (3 + 1), 68}
-};
+/**
+* \brief constructor for the class
+*
+* \param pCan Which canbus hardware to use (CAN0 or CAN1)
+* \param Rs pin to use for transceiver Rs control
+* \param En pin to use for transceiver enable
+*/
+CANRaw::CANRaw(Can* pCan, uint32_t En ) {
+	m_pCan = pCan;
+	enablePin = En;
+	bigEndian = false;
+}
 
 /**
  * \brief Configure CAN baudrate.
@@ -136,6 +100,24 @@ uint32_t CANRaw::set_baudrate(uint32_t ul_baudrate)
 	return 1;
 }
 
+
+uint32_t CANRaw::begin()
+{
+	return init(CAN_DEFAULT_BAUD);
+}
+
+uint32_t CANRaw::begin(uint32_t baudrate) 
+{
+	return init(baudrate);
+}
+
+uint32_t CANRaw::begin(uint32_t baudrate, uint8_t enablePin) 
+{
+	this->enablePin = enablePin;
+	return init(baudrate);
+}
+
+
 /**
  * \brief Initialize CAN controller.
  *
@@ -163,8 +145,10 @@ uint32_t CANRaw::init(uint32_t ul_baudrate)
 	if (m_pCan == CAN0) pmc_enable_periph_clk(ID_CAN0);
 	if (m_pCan == CAN1) pmc_enable_periph_clk(ID_CAN1);
 
-	m_Transceiver->DisableLowPower();
-	m_Transceiver->Enable();
+	if (enablePin != 255) {
+		pinMode(enablePin, OUTPUT);
+		digitalWrite(enablePin, HIGH);
+	}
 
 	/* Initialize the baudrate for CAN module. */
 	ul_flag = set_baudrate(ul_baudrate);
@@ -254,6 +238,23 @@ void CANRaw::setGeneralCallback(void (*cb)(CAN_FRAME *))
 	cbCANFrame[8] = cb;
 }
 
+void CANRaw::attachCANInterrupt(void (*cb)(CAN_FRAME *)) 
+{
+	setGeneralCallback(cb);
+}
+
+void CANRaw::attachCANInterrupt(uint8_t mailBox, void (*cb)(CAN_FRAME *)) 
+{
+	setCallback(mailBox, cb);
+}
+
+void CANRaw::detachCANInterrupt(uint8_t mailBox)
+{
+	if ((mailBox < 0) || (mailBox > 7)) return;
+	cbCANFrame[mailBox] = 0;
+}
+
+
 /**
  * \brief Enable CAN Controller.
  *
@@ -261,7 +262,7 @@ void CANRaw::setGeneralCallback(void (*cb)(CAN_FRAME *))
 void CANRaw::enable()
 {
 	m_pCan->CAN_MR |= CAN_MR_CANEN;
-	m_Transceiver->Enable();
+	if (enablePin != 255) digitalWrite(enablePin, HIGH);
 }
 
 /**
@@ -271,10 +272,7 @@ void CANRaw::enable()
 void CANRaw::disable()
 {
 	m_pCan->CAN_MR &= ~CAN_MR_CANEN;
-
-	m_Transceiver->EnableLowPower();
-    m_Transceiver->Disable();
-
+	if (enablePin != 255) digitalWrite(enablePin, LOW);
 }
 
 /**
@@ -617,12 +615,49 @@ void CANRaw::reset_all_mailbox()
 	}
 }
 
+void CANRaw::setBigEndian(bool end)  
+{
+	bigEndian = end;
+}
+
+void CANRaw::setWriteID(uint32_t id)
+{
+	write_id = id;
+}
+
+template <typename t> void CANRaw::write(t inputValue)
+{
+	CAN_FRAME tempFrame;
+	uint8_t *buff = (uint8_t *)inputValue;
+	int thisSize = sizeof(t);
+	if (thisSize > 8) thisSize = 8;
+	if (!bigEndian) {
+		for (int i = 0; i < thisSize; i++) 
+		{
+			tempFrame.data.bytes[i] = buff[i];
+		}
+	}
+	else //reverse byte order. The M3 is in little endian so this causes big endian order
+	{
+		for (int i = 0; i < thisSize; i++) 
+		{
+			tempFrame.data.bytes[i] = buff[thisSize - i - 1];
+		}
+	}
+
+	tempFrame.id = this->write_id;
+	tempFrame.length = thisSize;
+	if (this->write_id > 0x7FF) tempFrame.extended = true;
+	else tempFrame.extended = false;
+	sendFrame(tempFrame);
+}
+
 /**
  * \brief Send a frame out of this canbus port
  *
  * \param txFrame The filled out frame structure to use for sending
  *
- * \note Will do one of two things - 1. Sending the given frame out of the first available mailbox
+ * \note Will do one of two things - 1. Send the given frame out of the first available mailbox
  * or 2. queue the frame for sending later via interrupt. Automatically turns on TX interrupt
  * if necessary.
  */
@@ -906,17 +941,19 @@ uint32_t CANRaw::mailbox_tx_frame(uint8_t uc_index)
 	return CAN_MAILBOX_TRANSFER_OK;
 }
 
-/**
-* \brief constructor for the class
-*
-* \param pCan Which canbus hardware to use (CAN0 or CAN1)
-* \param Rs pin to use for transceiver Rs control
-* \param En pin to use for transceiver enable
-*/
-CANRaw::CANRaw(Can* pCan, uint32_t Rs, uint32_t En ) {
-	m_pCan = pCan;
-	m_Transceiver = new SSN65HVD234(Rs, En);
+int CANRaw::available()
+{
+	int val;
+	if (rx_avail()) 
+	{
+		val = rx_buffer_head - rx_buffer_tail;
+		//Now, because this is a cyclic buffer it is possible that the ordering was reversed
+		//So, handle that case
+		if (val < 0) val += SIZE_RX_BUFFER;
+	}
+	else return 0;
 }
+
 
 /**
 * \brief Check whether there are received canbus frames in the buffer
@@ -925,6 +962,12 @@ CANRaw::CANRaw(Can* pCan, uint32_t Rs, uint32_t En ) {
 */
 bool CANRaw::rx_avail() {
 	return (rx_buffer_head != rx_buffer_tail)?true:false;
+}
+
+//wrapper for syntactic sugar reasons - could have just been a #define
+uint32_t CANRaw::read(CAN_FRAME & buffer) 
+{
+	return get_rx_buff(buffer);
 }
 
 /**
@@ -1056,6 +1099,76 @@ int CANRaw::setRXFilter(uint8_t mailbox, uint32_t id, uint32_t mask, bool extend
 	return mailbox;
 }
 
+//set up to allow everything through. Sets up two mailboxes and returns the first one
+//Not a terribly good idea to call because it totally ignores most everything and just
+//quickly sets things up for all in. But, it's perfect for the novice getting started.
+int CANRaw::watchFor() 
+{
+	int retVal = setRXFilter(0, 0, false);
+	enable_interrupt(getMailboxIer(0));
+	setRXFilter(0, 0, true);
+	enable_interrupt(getMailboxIer(1));
+
+	return retVal;
+}
+
+//Let a single frame ID through. Automatic determination of extended. Also automatically sets mask
+int CANRaw::watchFor(uint32_t id)
+{
+	if (id > 0x7FF) return setRXFilter(id, 0x1FFFFFFF, true);
+	else return setRXFilter(id, 0x7FF, false);
+}
+
+//Allow a range of IDs through based on mask. Still auto determines extended.
+int CANRaw::watchFor(uint32_t id, uint32_t mask)
+{
+	if (id > 0x7FF) return setRXFilter(id, mask, true);
+	else return setRXFilter(id, mask, false);
+}
+
+//A bit more complicated. Makes sure that the range from id1 to id2 is let through. This might open
+//the floodgates if you aren't careful.
+int CANRaw::watchForRange(uint32_t id1, uint32_t id2)
+{
+	int id = 0;
+	int mask = 0;
+	int temp;
+
+	if (id1 > id2) 
+	{   //looks funny I know. In place swap with no temporary storage. Neato!
+		id1 = id1 ^ id2;
+		id2 = id1 ^ id2; //note difference here.
+		id1 = id1 ^ id2;
+	}
+
+	id = id1;
+
+	if (id2 <= 0x7FF) mask = 0x7FF;
+	else mask = 0x1FFFFFFF;
+
+	/* Here is a quick overview of the theory behind these calculations.
+	   We start with mask set to 11 or 29 set bits (all 1's)
+	   and id set to the lowest ID in the range.
+	   From there we go through every single ID possible in the range. For each ID
+	   we AND with the current ID. At the end only bits that never changed and were 1's
+	   will still be 1's. This yields the ID we can match against to let these frames through
+	   The mask is calculated by finding the bitfield difference between the lowest ID and
+	   the current ID. This calculation will be 1 anywhere the bits were different. We invert
+	   this so that it is 1 anywhere the bits where the same. Then we AND with the current Mask.
+	   At the end the mask will be 1 anywhere the bits never changed. This is the perfect mask.
+	*/
+	for (int c = id1; c <= id2; c++)
+	{
+		id &= c;
+		temp = (~(id1 ^ c)) & 0x1FFFFFFF;
+		mask &= temp;
+	}
+	//output of the above crazy loop is actually the end result.
+	if (id > 0x7FF) return setRXFilter(id, mask, true);
+	else return setRXFilter(id, mask, false);
+}
+
+
 /*
  * Get the IER (interrupt mask) for the specified mailbox index.
  *
@@ -1135,14 +1248,14 @@ void CANRaw::mailbox_int_handler(uint8_t mb, uint32_t ul_status) {
  */
 void CAN0_Handler(void)
 {
-	CAN.interruptHandler();
+	Can0.interruptHandler();
 }
 void CAN1_Handler(void)
 {
-	CAN2.interruptHandler();
+	Can1.interruptHandler();
 }
 
 /// instantiate the two canbus adapters
-CANRaw CAN(CAN0, CAN0_RS, CAN0_EN);
-CANRaw CAN2(CAN1, CAN1_RS, CAN1_EN);
+CANRaw Can0(CAN0, CAN0_EN);
+CANRaw Can1(CAN1, CAN1_EN);
 

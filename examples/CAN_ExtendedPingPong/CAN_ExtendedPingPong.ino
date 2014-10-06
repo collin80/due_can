@@ -29,8 +29,8 @@ void setup() {
   Serial.begin(115200);
   
   // Verify CAN0 and CAN1 initialization, baudrate is 1Mb/s:
-  if (CAN.init(CAN_BPS_1000K) &&
-	  CAN2.init(CAN_BPS_1000K)) {
+  if (Can0.begin(CAN_BPS_1000K) &&
+	  Can1.begin(CAN_BPS_1000K)) {
   }
   else {
     Serial.println("CAN initialization (sync) ERROR");
@@ -58,8 +58,8 @@ void setup() {
   //just the one ID we're interested in to get through.
   //The syntax is (mailbox #, ID, mask, extended)
   //You can also leave off the mailbox number: (ID, mask, extended)
-  CAN2.setRXFilter(0, TEST1_CAN_TRANSFER_ID + 0x200, 0x1FFFFFFF, true);
-  CAN.setRXFilter(0, TEST1_CAN_TRANSFER_ID, 0x1FFFFFFF, true);
+  Can1.watchFor(TEST1_CAN_TRANSFER_ID + 0x200);
+  Can0.watchFor(TEST1_CAN_TRANSFER_ID);
   
   test_1();
 }
@@ -72,21 +72,21 @@ static void test_1(void)
   uint32_t counter = 0;
         
   // Send out the first frame
-  CAN.sendFrame(frame2);
+  Can0.sendFrame(frame2);
   sentFrames++;
 
   while (1==1) {
-    if (CAN.rx_avail()) {
-      CAN.get_rx_buff(incoming);
-      CAN.sendFrame(frame2);
+    if (Can0.available() > 0) {
+      Can0.read(incoming);
+      Can0.sendFrame(frame2);
       delayMicroseconds(100);
       sentFrames++;
       receivedFrames++;
       counter++;
     }
-    if (CAN2.rx_avail()) {
-      CAN2.get_rx_buff(incoming);
-      CAN2.sendFrame(frame1);
+    if (Can1.available() > 0) {
+      Can1.read(incoming);
+      Can1.sendFrame(frame1);
       delayMicroseconds(100);
       sentFrames++;
       receivedFrames++;
