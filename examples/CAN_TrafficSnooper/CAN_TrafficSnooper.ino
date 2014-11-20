@@ -53,7 +53,7 @@ void loop(){
   CAN_FRAME incoming;
 
   if (Can0.available() > 0) {
-	Can1.read(incoming); 
+	Can0.read(incoming); 
 	printFrame(incoming);
   }
   if (Can1.available() > 0) {
