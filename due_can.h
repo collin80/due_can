@@ -19,7 +19,7 @@
 #ifndef _CAN_LIBRARY_
 #define _CAN_LIBRARY_
 
-#include "arduino.h"
+#include <Arduino.h>
 
 //add some extra stuff that is needed for Arduino 1.5.2
 #ifndef PINS_CAN0
