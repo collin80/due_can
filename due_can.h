@@ -243,7 +243,7 @@ class CANRaw
 	void mailbox_set_datal(uint8_t uc_index, uint32_t val);
 	void mailbox_set_datah(uint8_t uc_index, uint32_t val);
 
-	void sendFrame(CAN_FRAME& txFrame);
+	bool sendFrame(CAN_FRAME& txFrame);
 	void setWriteID(uint32_t id);
 	template <typename t> void write(t inputValue); //write a variable # of bytes out in a frame. Uses id as the ID.
 	void setBigEndian(bool);

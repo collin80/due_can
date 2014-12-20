@@ -165,9 +165,11 @@ to the buffered system described previously.
 
 Frame sending:
 
-sendFrame(Can0_FRAME&) - Send a frame over canbus. It will try to send immediately
+bool sendFrame(Can0_FRAME&) - Send a frame over canbus. It will try to send immediately
 but will automatically fall back to buffering the frame and sending via interrupt
-when the bus frees up.
+when the bus frees up. Returns whether it could send a frame (true/false). Only false if the TX buffer
+fills up for some reason. In that cases you'll have to send frames at a slower rate or check to be sure
+that the CAN bus is actually operational.
 Example:
 CAN_FRAME myFrame;
 myFrame.id = 45;

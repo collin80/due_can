@@ -660,35 +660,42 @@ template <typename t> void CANRaw::write(t inputValue)
  * \note Will do one of two things - 1. Send the given frame out of the first available mailbox
  * or 2. queue the frame for sending later via interrupt. Automatically turns on TX interrupt
  * if necessary.
+ * 
+ * Returns whether sending/queueing succeeded. Will not smash the queue if it gets full.
  */
-void CANRaw::sendFrame(CAN_FRAME& txFrame) 
+bool CANRaw::sendFrame(CAN_FRAME& txFrame) 
 {
-    for (int i = 0; i < 8; i++) {
-        if (((m_pCan->CAN_MB[i].CAN_MMR >> 24) & 7) == CAN_MB_TX_MODE)
-	{//is this mailbox set up as a TX box?
-	    if (m_pCan->CAN_MB[i].CAN_MSR & CAN_MSR_MRDY) 
-	    {//is it also available (not sending anything?)
-	        mailbox_set_id(i, txFrame.id, txFrame.extended);
-		mailbox_set_datalen(i, txFrame.length);
-		mailbox_set_priority(i, txFrame.priority);
-		for (uint8_t cnt = 0; cnt < 8; cnt++)
-		{    
-		    mailbox_set_databyte(i, cnt, txFrame.data.bytes[cnt]);
-		}       
-		enable_interrupt(0x01u << i); //enable the TX interrupt for this box
-		global_send_transfer_cmd((0x1u << i));
-		return; //we've sent it. mission accomplished.
-	    }
-	}
+	for (int i = 0; i < 8; i++) {
+		if (((m_pCan->CAN_MB[i].CAN_MMR >> 24) & 7) == CAN_MB_TX_MODE)
+		{//is this mailbox set up as a TX box?
+			if (m_pCan->CAN_MB[i].CAN_MSR & CAN_MSR_MRDY) 
+			{//is it also available (not sending anything?)
+				mailbox_set_id(i, txFrame.id, txFrame.extended);
+				mailbox_set_datalen(i, txFrame.length);
+				mailbox_set_priority(i, txFrame.priority);
+				for (uint8_t cnt = 0; cnt < 8; cnt++)
+				{    
+					mailbox_set_databyte(i, cnt, txFrame.data.bytes[cnt]);
+				}       
+				enable_interrupt(0x01u << i); //enable the TX interrupt for this box
+				global_send_transfer_cmd((0x1u << i));
+				return true; //we've sent it. mission accomplished.
+			}
+		}
     }
 	
     //if execution got to this point then no free mailbox was found above
-    //so, queue the frame.
+    //so, queue the frame if possible. But, don't increment the 
+	//tail if it would smash into the head and kill the queue.
+	uint8_t temp;
+	temp = (tx_buffer_tail + 1) % SIZE_TX_BUFFER;
+	if (temp == tx_buffer_head) return false;
     tx_frame_buff[tx_buffer_tail].id = txFrame.id;
     tx_frame_buff[tx_buffer_tail].extended = txFrame.extended;
     tx_frame_buff[tx_buffer_tail].length = txFrame.length;
     tx_frame_buff[tx_buffer_tail].data.value = txFrame.data.value;
-    tx_buffer_tail = (tx_buffer_tail + 1) % SIZE_TX_BUFFER;	
+    tx_buffer_tail = temp;
+	return true;
 }
 
 
@@ -1216,8 +1223,12 @@ void CANRaw::mailbox_int_handler(uint8_t mb, uint32_t ul_status) {
 			else if (cbCANFrame[8]) (*cbCANFrame[8])(&tempFrame);
 			else 
 			{
-				memcpy((void *)&rx_frame_buff[rx_buffer_head], &tempFrame, sizeof(CAN_FRAME));
-				rx_buffer_head = (rx_buffer_head + 1) % SIZE_RX_BUFFER;
+				uint8_t temp = (rx_buffer_head + 1) % SIZE_RX_BUFFER;
+				if (temp != rx_buffer_tail) 
+				{
+					memcpy((void *)&rx_frame_buff[rx_buffer_head], &tempFrame, sizeof(CAN_FRAME));
+					rx_buffer_head = temp;
+				}
 			}
 			break;
 		case 3: //transmit
