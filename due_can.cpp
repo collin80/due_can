@@ -176,6 +176,7 @@ uint32_t CANRaw::init(uint32_t ul_baudrate)
 		ul_tick++;
 	}
 
+	NVIC_SetPriority(m_pCan == CAN0 ? CAN0_IRQn : CAN1_IRQn, 12); //set a fairly low priority so almost anything can preempt
 	NVIC_EnableIRQ(m_pCan == CAN0 ? CAN0_IRQn : CAN1_IRQn); //tell the nested interrupt controller to turn on our interrupt
 
 	/* Timeout or the CAN module has been synchronized with the bus. */
