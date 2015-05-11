@@ -518,10 +518,7 @@ void CANRaw::reset_internal_timer()
  */
 void CANRaw::global_send_transfer_cmd(uint8_t uc_mask)
 {
-	uint32_t ul_reg;
-
-	ul_reg = m_pCan->CAN_TCR & ((uint32_t)~GLOBAL_MAILBOX_MASK);
-	m_pCan->CAN_TCR = ul_reg | uc_mask;
+	m_pCan->CAN_TCR = uc_mask & GLOBAL_MAILBOX_MASK;
 }
 
 /**
@@ -799,7 +796,7 @@ uint32_t CANRaw::mailbox_get_id(uint8_t uc_index) {
  * \brief Set the transmission priority for given mailbox
  *
  * \param uc_index The mailbox to use
- * \param pri The priority to set (0-15 in ascending priority)
+ * \param pri The priority to set (0-15 in descending priority)
  *
  */
 void CANRaw::mailbox_set_priority(uint8_t uc_index, uint8_t pri) 
