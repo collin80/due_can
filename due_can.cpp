@@ -1088,6 +1088,7 @@ int CANRaw::setRXFilter(uint32_t id, uint32_t mask, bool extended) {
 /**
 * \brief Set up an RX mailbox (given MB number) filter
 *
+
 * \param mailbox Which mailbox to use (0-7)
 * \param id The ID to match against
 * \param mask The mask to apply before ID matching
@@ -1109,9 +1110,9 @@ int CANRaw::setRXFilter(uint8_t mailbox, uint32_t id, uint32_t mask, bool extend
 //quickly sets things up for all in. But, it's perfect for the novice getting started.
 int CANRaw::watchFor() 
 {
-	int retVal = setRXFilter(0, 0, false);
+	int retVal = setRXFilter(0, 0, 0, false);
 	enable_interrupt(getMailboxIer(0));
-	setRXFilter(0, 0, true);
+	setRXFilter(1, 0, 0, true);
 	enable_interrupt(getMailboxIer(1));
 
 	return retVal;
