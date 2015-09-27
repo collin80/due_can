@@ -46,6 +46,19 @@
 #define CAN_DISABLE_ALL_INTERRUPT_MASK 0xffffffff
 
 /** Define the typical baudrate for CAN communication in KHz. */
+#ifdef CAN_BPS_500K
+#undef CAN_BPS_1000K 
+#undef CAN_BPS_800K                 
+#undef CAN_BPS_500K                 
+#undef CAN_BPS_250K                 
+#undef CAN_BPS_125K                  
+#undef CAN_BPS_50K                   
+#undef CAN_BPS_33333				  
+#undef CAN_BPS_25K                   
+#undef CAN_BPS_10K                   
+#undef CAN_BPS_5K                   
+#endif
+
 #define CAN_BPS_1000K                 1000000
 #define CAN_BPS_800K                  800000
 #define CAN_BPS_500K                  500000
