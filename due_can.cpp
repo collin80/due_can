@@ -31,6 +31,8 @@ CANRaw::CANRaw(Can* pCan, uint32_t En ) {
 	m_pCan = pCan;
 	enablePin = En;
 	bigEndian = false;
+	listener = NULL;
+	callbacksActive = 0; //none. Bitfield were bits 0-7 are the mailboxes and bit 8 is the general callback
 }
 
 /**
@@ -255,7 +257,38 @@ void CANRaw::detachCANInterrupt(uint8_t mailBox)
 	cbCANFrame[mailBox] = 0;
 }
 
+void CANRaw::attachObj(CANListener *listener)
+{
+	this->listener = listener;
+	callbacksActive = 0;
+}
 
+void CANRaw::attachMBHandler(uint8_t mailBox)
+{
+	if (mailBox >= 0 && mailBox < 8)
+	{
+		callbacksActive |= (1<<mailBox);
+	}
+}
+
+void CANRaw::detachMBHandler(uint8_t mailBox)
+{
+	if (mailBox >= 0 && mailBox < 8)
+	{
+		callbacksActive &= ~(1<<mailBox);
+	}  
+}
+
+void CANRaw::attachGeneralHandler()
+{
+	callbacksActive |= 256;
+}
+
+void CANRaw::detachGeneralHandler()
+{
+	callbacksActive &= ~256;
+}
+	
 /**
  * \brief Enable CAN Controller.
  *
@@ -1220,7 +1253,18 @@ void CANRaw::mailbox_int_handler(uint8_t mb, uint32_t ul_status) {
 			//First, try to send a callback. If no callback registered then buffer the frame.
 			if (cbCANFrame[mb]) (*cbCANFrame[mb])(&tempFrame);
 			else if (cbCANFrame[8]) (*cbCANFrame[8])(&tempFrame);
-			else 
+			else if (callbacksActive & (1<<mb))
+			{
+				if (listener)
+				{
+					listener->gotFrame(&tempFrame, mb);
+				}
+			}
+			else if (callbacksActive & 256) //general callback for object oriented callbacks
+			{
+				listener->gotFrame(&tempFrame, -1);
+			}
+			else //if none of the callback types caught this frame then queue it in the buffer
 			{
 				uint8_t temp = (rx_buffer_head + 1) % SIZE_RX_BUFFER;
 				if (temp != rx_buffer_tail) 

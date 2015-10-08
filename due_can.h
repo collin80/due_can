@@ -167,6 +167,12 @@ typedef struct
 	BytesUnion data;	// 64 bits - lots of ways to access it.
 } CAN_FRAME;
 
+class CANListener
+{
+public:
+	virtual void gotFrame(CAN_FRAME *frame, int mailbox);
+};
+
 class CANRaw
 {
   protected:
@@ -188,6 +194,8 @@ class CANRaw
 	bool bigEndian;
 
 	void (*cbCANFrame[9])(CAN_FRAME *); //8 mailboxes plus an optional catch all
+	CANListener *listener;
+	int callbacksActive; //bitfield letting the code know which callbacks to actually try to use (for object oriented callbacks only)
 
   public:
 
@@ -215,6 +223,37 @@ class CANRaw
 
 	void enable();
 	void disable();
+
+	bool sendFrame(CAN_FRAME& txFrame);
+	void setWriteID(uint32_t id);
+	template <typename t> void write(t inputValue); //write a variable # of bytes out in a frame. Uses id as the ID.
+	void setBigEndian(bool);
+
+	void setCallback(int mailbox, void (*cb)(CAN_FRAME *));
+	void setGeneralCallback(void (*cb)(CAN_FRAME *));
+	//note that these below versions still use mailbox number. There isn't a good way around this. 
+	void attachCANInterrupt(void (*cb)(CAN_FRAME *)); //alternative callname for setGeneralCallback
+	void attachCANInterrupt(uint8_t mailBox, void (*cb)(CAN_FRAME *));
+	void detachCANInterrupt(uint8_t mailBox);
+	
+	//now, object oriented versions to make OO projects easier
+	void attachObj(CANListener *listener);
+	void attachMBHandler(uint8_t mailBox);
+	void detachMBHandler(uint8_t mailBox);
+	void attachGeneralHandler();
+	void detachGeneralHandler();
+
+	void reset_all_mailbox();
+	void interruptHandler();
+	bool rx_avail();
+	int available(); //like rx_avail but returns the number of waiting frames
+
+	uint32_t get_rx_buff(CAN_FRAME &);
+	uint32_t read(CAN_FRAME &);
+	
+	//misc old cruft kept around just in case anyone actually used any of it in older code.
+	//some are used within the functions above. Unless you really know of a good reason to use
+	//any of these you probably should steer clear of them.
 	void disable_low_power_mode();
 	void enable_low_power_mode();
 	void disable_autobaud_listen_mode();
@@ -255,26 +294,6 @@ class CANRaw
 	void mailbox_set_datalen(uint8_t uc_index, uint8_t dlen);
 	void mailbox_set_datal(uint8_t uc_index, uint32_t val);
 	void mailbox_set_datah(uint8_t uc_index, uint32_t val);
-
-	bool sendFrame(CAN_FRAME& txFrame);
-	void setWriteID(uint32_t id);
-	template <typename t> void write(t inputValue); //write a variable # of bytes out in a frame. Uses id as the ID.
-	void setBigEndian(bool);
-
-	void setCallback(int mailbox, void (*cb)(CAN_FRAME *));
-	void setGeneralCallback(void (*cb)(CAN_FRAME *));
-	//note that these below versions still use mailbox number. There isn't a good way around this. 
-	void attachCANInterrupt(void (*cb)(CAN_FRAME *)); //alternative callname for setGeneralCallback
-	void attachCANInterrupt(uint8_t mailBox, void (*cb)(CAN_FRAME *));
-	void detachCANInterrupt(uint8_t mailBox);
-
-	void reset_all_mailbox();
-	void interruptHandler();
-	bool rx_avail();
-	int available(); //like rx_avail but returns the number of waiting frames
-
-	uint32_t get_rx_buff(CAN_FRAME &);
-	uint32_t read(CAN_FRAME &);
 };
 
 extern CANRaw Can0;
