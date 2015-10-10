@@ -73,14 +73,16 @@ void setup()
   
   Can0.attachObj(&myClass);
   //let library know we want to receive callbacks for the following mailboxes
-  Can0.attachMBHandler(0);
-  Can0.attachMBHandler(1);
-  Can0.attachMBHandler(3);
-  Can0.attachMBHandler(4);
-  Can0.attachMBHandler(5);
+  //once we attach above the canbus object knows about us. The actual functions
+  //to attach are members of CANListener so use your class name
+  myClass.attachMBHandler(0);
+  myClass.attachMBHandler(1);
+  myClass.attachMBHandler(3);
+  myClass.attachMBHandler(4);
+  myClass.attachMBHandler(5);
   
   //set to get a callback for any other mailboxes not already covered above
-  Can0.attachGeneralHandler();
+  myClass.attachGeneralHandler();
 }
 
 void loop(){ //All work is done via callback as frames come in - no need to poll for them. SO, just print periodic message to show we're alive
