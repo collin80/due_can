@@ -63,11 +63,11 @@ typedef union {
 		uint32_t high;
 	};
 	struct {
-        uint16_t s0;
+        	uint16_t s0;
 		uint16_t s1;
 		uint16_t s2;
 		uint16_t s3;
-    };
+    	};
 	uint8_t bytes[8];
 	uint8_t byte[8]; //alternate name so you can omit the s if you feel it makes more sense
 } BytesUnion;

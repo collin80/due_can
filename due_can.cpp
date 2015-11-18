@@ -31,6 +31,9 @@ CANRaw::CANRaw(Can* pCan, uint32_t En ) {
 	m_pCan = pCan;
 	enablePin = En;
 	bigEndian = false;
+	busSpeed = 0;
+	
+	for (int i = 0; i < 4; i++) listener[i] = NULL;
 }
 
 /**
@@ -117,6 +120,10 @@ uint32_t CANRaw::begin(uint32_t baudrate, uint8_t enablePin)
 	return init(baudrate);
 }
 
+uint32_t CANRaw::getBusSpeed()
+{
+	return busSpeed;
+}
 
 /**
  * \brief Initialize CAN controller.
@@ -132,6 +139,10 @@ uint32_t CANRaw::init(uint32_t ul_baudrate)
 {
 	uint32_t ul_flag;
 	uint32_t ul_tick;
+	
+	if (busSpeed == ul_baudrate) return ul_baudrate; //no need to reinitialize so just return that it was a success
+	else if (busSpeed != 0) return 0xFFFFFFFF; //ERROR! The bus was already initialized and you're trying to change it! Use set_baudrate if you really want to do that.
+
 
 	//initialize all function pointers to null
 	for (int i = 0; i < 9; i++) cbCANFrame[i] = 0;
@@ -176,14 +187,22 @@ uint32_t CANRaw::init(uint32_t ul_baudrate)
 		ul_tick++;
 	}
 
-	NVIC_SetPriority(m_pCan == CAN0 ? CAN0_IRQn : CAN1_IRQn, 12); //set a fairly low priority so almost anything can preempt
+	//set a fairly low priority so almost anything can preempt.
+	//this has the effect that most anything can interrupt our interrupt handler
+	//that's a good thing because the interrupt handler is long and complicated
+	//and can send callbacks into user code which could also be long and complicated.
+	//But, keep in mind that user code in callbacks runs in interrupt context
+	//but can still be preempted at any time.
+	NVIC_SetPriority(m_pCan == CAN0 ? CAN0_IRQn : CAN1_IRQn, 12); 
+	
 	NVIC_EnableIRQ(m_pCan == CAN0 ? CAN0_IRQn : CAN1_IRQn); //tell the nested interrupt controller to turn on our interrupt
 
 	/* Timeout or the CAN module has been synchronized with the bus. */
 	if (CAN_TIMEOUT == ul_tick) {
 		return 0;
 	} else {
-		return 1;
+		busSpeed = ul_baudrate;
+		return busSpeed;
 	}
 }
 
@@ -255,6 +274,32 @@ void CANRaw::detachCANInterrupt(uint8_t mailBox)
 	cbCANFrame[mailBox] = 0;
 }
 
+boolean CANRaw::attachObj(CANListener *listener)
+{
+	for (int i = 0; i < SIZE_LISTENERS; i++)
+	{
+		if (this->listener[i] == NULL)
+		{
+			this->listener[i] = listener;
+			listener->callbacksActive = 0;
+			return true;			
+		}
+	}
+	return false;
+}
+
+boolean CANRaw::detachObj(CANListener *listener)
+{
+	for (int i = 0; i < SIZE_LISTENERS; i++)
+	{
+		if (this->listener[i] == listener)
+		{
+			this->listener[i] = NULL;			
+			return true;			
+		}
+	}
+	return false;  
+}
 
 /**
  * \brief Enable CAN Controller.
@@ -1134,6 +1179,8 @@ int CANRaw::watchFor(uint32_t id, uint32_t mask)
 
 //A bit more complicated. Makes sure that the range from id1 to id2 is let through. This might open
 //the floodgates if you aren't careful.
+//There are undoubtedly better ways to calculate the proper values for the filter but this way seems to work.
+//It'll be kind of slow if you try to let a huge span through though.
 int CANRaw::watchForRange(uint32_t id1, uint32_t id2)
 {
 	int id = 0;
@@ -1207,9 +1254,12 @@ uint32_t CANRaw::getMailboxIer(int8_t mailbox) {
 * \brief Handle a mailbox interrupt event
 * \param mb which mailbox generated this event
 * \param ul_status The status register of the canbus hardware
+* 
 */
 void CANRaw::mailbox_int_handler(uint8_t mb, uint32_t ul_status) {
 	CAN_FRAME tempFrame;
+	boolean caughtFrame = false;
+	CANListener *thisListener;
 	if (mb > 7) mb = 7;
 	if (m_pCan->CAN_MB[mb].CAN_MSR & CAN_MSR_MRDY) { //mailbox signals it is ready
 		switch(((m_pCan->CAN_MB[mb].CAN_MMR >> 24) & 7)) { //what sort of mailbox is it?
@@ -1218,9 +1268,37 @@ void CANRaw::mailbox_int_handler(uint8_t mb, uint32_t ul_status) {
 		case 4: //consumer - technically still a receive buffer
 			mailbox_read(mb, &tempFrame);
 			//First, try to send a callback. If no callback registered then buffer the frame.
-			if (cbCANFrame[mb]) (*cbCANFrame[mb])(&tempFrame);
-			else if (cbCANFrame[8]) (*cbCANFrame[8])(&tempFrame);
-			else 
+			if (cbCANFrame[mb]) 
+			{
+				caughtFrame = true;
+				(*cbCANFrame[mb])(&tempFrame);
+			}
+			else if (cbCANFrame[8]) 
+			{
+				caughtFrame = true;
+				(*cbCANFrame[8])(&tempFrame);
+			}
+			else
+			{
+				for (int listenerPos = 0; listenerPos < SIZE_LISTENERS; listenerPos++)
+				{
+					thisListener = listener[listenerPos];
+					if (thisListener != NULL)
+					{
+						if (thisListener->callbacksActive & (1 << mb)) 
+						{
+							caughtFrame = true;
+							thisListener->gotFrame(&tempFrame, mb);
+						}
+						else if (thisListener->callbacksActive & 256) 
+						{
+							caughtFrame = true;
+							thisListener->gotFrame(&tempFrame, -1);
+						}
+					}
+				}
+			}
+			if (!caughtFrame) //if none of the callback types caught this frame then queue it in the buffer
 			{
 				uint8_t temp = (rx_buffer_head + 1) % SIZE_RX_BUFFER;
 				if (temp != rx_buffer_tail) 
@@ -1250,6 +1328,44 @@ void CANRaw::mailbox_int_handler(uint8_t mb, uint32_t ul_status) {
 		}
 	}
 }
+
+CANListener::CANListener()
+{
+	callbacksActive = 0; //none. Bitfield were bits 0-7 are the mailboxes and bit 8 is the general callback
+}
+
+//an empty version so that the linker doesn't complain that no implementation exists.
+void CANListener::gotFrame(CAN_FRAME *frame, int mailbox)
+{
+  
+}
+
+void CANListener::attachMBHandler(uint8_t mailBox)
+{
+	if (mailBox >= 0 && mailBox < 8)
+	{
+		callbacksActive |= (1<<mailBox);
+	}
+}
+
+void CANListener::detachMBHandler(uint8_t mailBox)
+{
+	if (mailBox >= 0 && mailBox < 8)
+	{
+		callbacksActive &= ~(1<<mailBox);
+	}  
+}
+
+void CANListener::attachGeneralHandler()
+{
+	callbacksActive |= 256;
+}
+
+void CANListener::detachGeneralHandler()
+{
+	callbacksActive &= ~256;
+}
+
 
 /**
  * \brief Interrupt dispatchers - Never directly call these

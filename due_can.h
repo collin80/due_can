@@ -36,8 +36,8 @@
 #define CAN		Can0
 #define CAN2	Can1
 
-#define CAN0_EN  62
-#define CAN1_EN  65
+#define CAN0_EN  50 //these enable pins match most all recent EVTV boards (EVTVDue, CAN Due 2.0)
+#define CAN1_EN  48 //they're only defaults, you can set whichever pin you need when calling begin()
 
 /** Define the Mailbox mask for eight mailboxes. */
 #define GLOBAL_MAILBOX_MASK           0x000000ff
@@ -46,28 +46,29 @@
 #define CAN_DISABLE_ALL_INTERRUPT_MASK 0xffffffff
 
 /** Define the typical baudrate for CAN communication. */
-#ifdef CAN_BPS_1000K
-#undef CAN_BPS_1000K
-#undef CAN_BPS_800K
-#undef CAN_BPS_500K
-#undef CAN_BPS_250K
-#undef CAN_BPS_125K
-#undef CAN_BPS_50K
-#undef CAN_BPS_33333
-#undef CAN_BPS_25K
-#undef CAN_BPS_10K
-#undef CAN_BPS_5K
+#ifdef CAN_BPS_500K
+#undef CAN_BPS_1000K 
+#undef CAN_BPS_800K                 
+#undef CAN_BPS_500K                 
+#undef CAN_BPS_250K                 
+#undef CAN_BPS_125K                  
+#undef CAN_BPS_50K                   
+#undef CAN_BPS_33333				  
+#undef CAN_BPS_25K                   
+#undef CAN_BPS_10K                   
+#undef CAN_BPS_5K                   
 #endif
-#define CAN_BPS_1000K                 1000000
-#define CAN_BPS_800K                  800000
-#define CAN_BPS_500K                  500000
-#define CAN_BPS_250K                  250000
-#define CAN_BPS_125K                  125000
-#define CAN_BPS_50K                   50000
-#define CAN_BPS_33333				  33333
-#define CAN_BPS_25K                   25000
-#define CAN_BPS_10K                   10000
-#define CAN_BPS_5K                    5000
+
+#define CAN_BPS_1000K	1000000
+#define CAN_BPS_800K	800000
+#define CAN_BPS_500K	500000
+#define CAN_BPS_250K	250000
+#define CAN_BPS_125K	125000
+#define CAN_BPS_50K		50000
+#define CAN_BPS_33333	33333
+#define CAN_BPS_25K		25000
+#define CAN_BPS_10K		10000
+#define CAN_BPS_5K		5000
 
 #define CAN_DEFAULT_BAUD	CAN_BPS_250K
 
@@ -87,6 +88,7 @@
 
 #define SIZE_RX_BUFFER	32 //RX incoming ring buffer is this big
 #define SIZE_TX_BUFFER	16 //TX ring buffer is this big
+#define SIZE_LISTENERS	4 //number of classes that can register as listeners with this class
 
 	/** Define the timemark mask. */
 #define TIMEMARK_MASK              0x0000ffff
@@ -146,7 +148,7 @@ typedef union {
 		uint32_t high;
 	};
 	struct {
-        uint16_t s0;
+		uint16_t s0;
 		uint16_t s1;
 		uint16_t s2;
 		uint16_t s3;
@@ -166,6 +168,24 @@ typedef struct
 	BytesUnion data;	// 64 bits - lots of ways to access it.
 } CAN_FRAME;
 
+class CANListener
+{
+public:
+	CANListener();
+	
+	virtual void gotFrame(CAN_FRAME *frame, int mailbox);
+
+  	void attachMBHandler(uint8_t mailBox);
+	void detachMBHandler(uint8_t mailBox);
+	void attachGeneralHandler();
+	void detachGeneralHandler();
+	
+private:
+	int callbacksActive; //bitfield letting the code know which callbacks to actually try to use (for object oriented callbacks only)
+	
+	friend class CANRaw; //class has to have access to the the guts of this one 
+};
+
 class CANRaw
 {
   protected:
@@ -183,10 +203,13 @@ class CANRaw
 	void mailbox_int_handler(uint8_t mb, uint32_t ul_status);
 
 	uint8_t enablePin;
+	uint32_t busSpeed; //what speed is the bus currently initialized at? 0 if it is off right now
+	
 	uint32_t write_id; //public storage for an id. Will be used by the write function to set which ID to send to.
 	bool bigEndian;
 
 	void (*cbCANFrame[9])(CAN_FRAME *); //8 mailboxes plus an optional catch all
+	CANListener *listener[SIZE_LISTENERS];	
 
   public:
 
@@ -211,9 +234,38 @@ class CANRaw
 	uint32_t begin();
 	uint32_t begin(uint32_t baudrate);
 	uint32_t begin(uint32_t baudrate, uint8_t enablePin);
+	uint32_t getBusSpeed();
 
 	void enable();
 	void disable();
+
+	bool sendFrame(CAN_FRAME& txFrame);
+	void setWriteID(uint32_t id);
+	template <typename t> void write(t inputValue); //write a variable # of bytes out in a frame. Uses id as the ID.
+	void setBigEndian(bool);
+
+	void setCallback(int mailbox, void (*cb)(CAN_FRAME *));
+	void setGeneralCallback(void (*cb)(CAN_FRAME *));
+	//note that these below versions still use mailbox number. There isn't a good way around this. 
+	void attachCANInterrupt(void (*cb)(CAN_FRAME *)); //alternative callname for setGeneralCallback
+	void attachCANInterrupt(uint8_t mailBox, void (*cb)(CAN_FRAME *));
+	void detachCANInterrupt(uint8_t mailBox);
+	
+	//now, object oriented versions to make OO projects easier
+	boolean attachObj(CANListener *listener);
+	boolean detachObj(CANListener *listener);
+
+	void reset_all_mailbox();
+	void interruptHandler();
+	bool rx_avail();
+	int available(); //like rx_avail but returns the number of waiting frames
+
+	uint32_t get_rx_buff(CAN_FRAME &);
+	uint32_t read(CAN_FRAME &);
+	
+	//misc old cruft kept around just in case anyone actually used any of it in older code.
+	//some are used within the functions above. Unless you really know of a good reason to use
+	//any of these you probably should steer clear of them.
 	void disable_low_power_mode();
 	void enable_low_power_mode();
 	void disable_autobaud_listen_mode();
@@ -254,26 +306,6 @@ class CANRaw
 	void mailbox_set_datalen(uint8_t uc_index, uint8_t dlen);
 	void mailbox_set_datal(uint8_t uc_index, uint32_t val);
 	void mailbox_set_datah(uint8_t uc_index, uint32_t val);
-
-	bool sendFrame(CAN_FRAME& txFrame);
-	void setWriteID(uint32_t id);
-	template <typename t> void write(t inputValue); //write a variable # of bytes out in a frame. Uses id as the ID.
-	void setBigEndian(bool);
-
-	void setCallback(int mailbox, void (*cb)(CAN_FRAME *));
-	void setGeneralCallback(void (*cb)(CAN_FRAME *));
-	//note that these below versions still use mailbox number. There isn't a good way around this. 
-	void attachCANInterrupt(void (*cb)(CAN_FRAME *)); //alternative callname for setGeneralCallback
-	void attachCANInterrupt(uint8_t mailBox, void (*cb)(CAN_FRAME *));
-	void detachCANInterrupt(uint8_t mailBox);
-
-	void reset_all_mailbox();
-	void interruptHandler();
-	bool rx_avail();
-	int available(); //like rx_avail but returns the number of waiting frames
-
-	uint32_t get_rx_buff(CAN_FRAME &);
-	uint32_t read(CAN_FRAME &);
 };
 
 extern CANRaw Can0;
