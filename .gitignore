@@ -1,13 +1,23 @@
-# Compiled Object files
-*.slo
-*.lo
+# Build and Release Folders
+bin/
+bin-debug/
+bin-release/
+
+# Other files and folders
+.settings/
+arduino
+Libraries
+Release
+.project
+
+# Project files, i.e. `.project`, `.actionScriptProperties` and `.flexProperties`
+# should NOT be excluded as they contain compiler settings and other important
+# information for Eclipse / Flash Builder.
+*.d
+*.eep
 *.o
-
-# Compiled Dynamic libraries
-*.so
-*.dylib
-
-# Compiled Static libraries
-*.lai
-*.la
-*.a
+*.lss
+*.elf
+*.map
+*.srec
+*.vcx*

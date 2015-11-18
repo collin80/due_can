@@ -65,29 +65,29 @@ void setup()
   Serial.begin(115200);
   
   // Initialize CAN0, Set the proper baud rates here
-  CAN.init(CAN_BPS_250K);
+  Can0.begin(CAN_BPS_250K);
   
   //By default there are 7 RX mailboxes for each device
   //extended
   //syntax is mailbox, ID, mask, extended
-  CAN.setRXFilter(0, 0x2FF00, 0x1FF2FF00, true);
-  CAN.setRXFilter(1, 0x1F0000, 0x1F1F0000, true);
-  CAN.setRXFilter(2, 0, 0, true); //catch all mailbox
+  Can0.setRXFilter(0, 0x2FF00, 0x1FF2FF00, true);
+  Can0.setRXFilter(1, 0x1F0000, 0x1F1F0000, true);
+  Can0.setRXFilter(2, 0, 0, true); //catch all mailbox
   
   //standard  
-  CAN.setRXFilter(3, 0x40F, 0x7FF, false);
-  CAN.setRXFilter(4, 0x310, 0x7F0, false);
-  CAN.setRXFilter(5, 0x200, 0x700, false);
-  CAN.setRXFilter(6, 0, 0, false); //catch all mailbox
+  Can0.setRXFilter(3, 0x40F, 0x7FF, false);
+  Can0.setRXFilter(4, 0x310, 0x7F0, false);
+  Can0.watchFor(0x200, 0x700); //used in place of above syntax
+  Can0.setRXFilter(0, 0, false); //catch all mailbox - no mailbox ID specified
   
   //now register all of the callback functions.
-  CAN.setCallback(0, gotFrameMB0);
-  CAN.setCallback(1, gotFrameMB1);
-  CAN.setCallback(3, gotFrameMB3);
-  CAN.setCallback(4, gotFrameMB4);
-  CAN.setCallback(5, gotFrameMB5);
+  Can0.setCallback(0, gotFrameMB0);
+  Can0.setCallback(1, gotFrameMB1);
+  Can0.setCallback(3, gotFrameMB3);
+  Can0.setCallback(4, gotFrameMB4);
+  Can0.setCallback(5, gotFrameMB5);
   //this function will get a callback for any mailbox that doesn't have a registered callback from above -> 2 and 6
-  CAN.setGeneralCallback(gotFrame);
+  Can0.setGeneralCallback(gotFrame);
   
 }
 
