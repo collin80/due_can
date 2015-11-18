@@ -1,5 +1,6 @@
 ###classes, datatypes, C++ keywords
-CAN_FRAME	KEYWORD1
+CAN_FRAME		KEYWORD1
+CANListener	KEYWORD1
 
 ###functions and methods
 setRXFilter				KEYWORD2
@@ -64,6 +65,10 @@ attachCANInterrupt			KEYWORD2
 detachCANInterrupt			KEYWORD2
 available					KEYWORD2
 read						KEYWORD2
+getBusSpeed				KEYWORD2
+attachObj					KEYWORD2
+detachObj					KEYWORD2
+
 
 CAN	KEYWORD3
 CAN2	KEYWORD3
