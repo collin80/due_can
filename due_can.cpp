@@ -140,9 +140,9 @@ uint32_t CANRaw::init(uint32_t ul_baudrate)
 	uint32_t ul_flag;
 	uint32_t ul_tick;
 	
-	if (busSpeed == ul_baudrate) return ul_baudrate; //no need to reinitialize so just return that it was a success
-	else if (busSpeed != 0) return 0xFFFFFFFF; //ERROR! The bus was already initialized and you're trying to change it! Use set_baudrate if you really want to do that.
-
+	//there used to be code here to cause this function to not run if the hardware is already initialized. But,
+	//it can be helpful to reinitialize. For instance, if the bus rate was set improperly you might need to
+	//go back through this code to reset the hardware.
 
 	//initialize all function pointers to null
 	for (int i = 0; i < 9; i++) cbCANFrame[i] = 0;
