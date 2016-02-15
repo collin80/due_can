@@ -46,8 +46,8 @@ Then, it is on to using the newly set-up canbus port:
 This is the structure you will use for both sending and receiving.
 typedef struct
 {
-	uint32_t id;		// Can0 be either 11 or 29 bit ID
-	uint32_t fid;        // Family ID is a somewhat advanced thing. You Can0 ignore it.
+	uint32_t id;		// Can be either 11 or 29 bit ID
+	uint32_t fid;        // Family ID is a somewhat advanced thing. You can ignore it.
 	uint8_t rtr;		// Remote Transmission Request - Don't use this.
 	uint8_t priority;	// Priority for TX frames. Probably not that useful normally
 	uint8_t extended;//Set to true for extended frames, false for standard
@@ -108,11 +108,11 @@ setNumTXBoxes(txboxes) - Above it was mentioned that the default setup is to
 have 7 RX mailboxes and 1 TX mailbox. This should work for 95% of programs 
 because the underlying library code uses interrupts with large buffers. But, if you
 will only be sending or only receiving or if you otherwise really need to tweak the
-arrangement you Can0 with this function. This function totally reinitializes all
+arrangement you can with this function. This function totally reinitializes all
 mailboxes so be sure to call this function before you start setting up your filters.
 Example: Can0.setNumTXBoxes(2);
 
-There are two ways to receive canbus frames with this library. You Can0 choose from
+There are two ways to receive canbus frames with this library. You can choose from
 callback driven reception or buffered frames. Either one is interrupt driven. The
 choice really comes down to whether you'd like to process frames at a given point
 in your code or whether you'd like to immediately get a call when a frame comes in.
