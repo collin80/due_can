@@ -506,7 +506,7 @@ uint32_t CANRaw::get_status()
  *
  * \retval The internal CAN free-running timer counter.
  */
-uint32_t CANRaw::get_internal_timer_value()
+uint16_t CANRaw::get_internal_timer_value()
 {
 	return (m_pCan->CAN_TIM);
 }
@@ -517,7 +517,7 @@ uint32_t CANRaw::get_internal_timer_value()
  *
  * \retval The timestamp value.
  */
-uint32_t CANRaw::get_timestamp_value()
+uint16_t CANRaw::get_timestamp_value()
 {
 	return (m_pCan->CAN_TIMESTP);
 }

@@ -284,8 +284,8 @@ class CANRaw
 	void disable_interrupt(uint32_t dw_mask);
 	uint32_t get_interrupt_mask();
 	uint32_t get_status();
-	uint32_t get_internal_timer_value();
-	uint32_t get_timestamp_value();
+	uint16_t get_internal_timer_value();
+	uint16_t get_timestamp_value();
 	uint8_t get_tx_error_cnt();
 	uint8_t get_rx_error_cnt();
 	void reset_internal_timer();
