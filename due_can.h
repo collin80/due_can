@@ -223,7 +223,7 @@ class CANRaw
 	int watchFor(uint32_t id, uint32_t mask); //allow a range of ids through
 	int watchForRange(uint32_t id1, uint32_t id2); //try to allow the range from id1 to id2 - automatically determine base ID and mask
 
-	void setNumTXBoxes(int txboxes);
+	int setNumTXBoxes(int txboxes);
 	int findFreeRXMailbox();
 	uint8_t mailbox_get_mode(uint8_t uc_index);
 	uint32_t mailbox_get_id(uint8_t uc_index);
