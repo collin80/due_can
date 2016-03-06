@@ -210,8 +210,10 @@ uint32_t CANRaw::init(uint32_t ul_baudrate)
  *
  * \param txboxes How many of the 8 boxes should be used for TX
  *
+ * \retval number of tx boxes set.
+ *
  */
-void CANRaw::setNumTXBoxes(int txboxes) {
+int CANRaw::setNumTXBoxes(int txboxes) {
 	int c;
 
 	if (txboxes > 8) txboxes = 8;
@@ -231,6 +233,8 @@ void CANRaw::setNumTXBoxes(int txboxes) {
 		mailbox_set_priority(c, 10);
 		mailbox_set_accept_mask(c, 0x7FF, false);
 	}
+	
+	return (numTXBoxes);
 }
 
 /**
