@@ -1183,9 +1183,9 @@ int CANRaw::watchFor(uint32_t id, uint32_t mask)
 //It'll be kind of slow if you try to let a huge span through though.
 int CANRaw::watchForRange(uint32_t id1, uint32_t id2)
 {
-	int id = 0;
-	int mask = 0;
-	int temp;
+	uint32_t id = 0;
+	uint32_t mask = 0;
+	uint32_t temp;
 
 	if (id1 > id2) 
 	{   //looks funny I know. In place swap with no temporary storage. Neato!
@@ -1210,7 +1210,7 @@ int CANRaw::watchForRange(uint32_t id1, uint32_t id2)
 	   this so that it is 1 anywhere the bits where the same. Then we AND with the current Mask.
 	   At the end the mask will be 1 anywhere the bits never changed. This is the perfect mask.
 	*/
-	for (int c = id1; c <= id2; c++)
+	for (uint32_t c = id1; c <= id2; c++)
 	{
 		id &= c;
 		temp = (~(id1 ^ c)) & 0x1FFFFFFF;
