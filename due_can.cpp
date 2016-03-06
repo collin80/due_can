@@ -780,7 +780,8 @@ uint32_t CANRaw::mailbox_read(uint8_t uc_index, volatile CAN_FRAME *rxframe)
 	}
 	rxframe->fid = m_pCan->CAN_MB[uc_index].CAN_MFID;
 	rxframe->length = (ul_status & CAN_MSR_MDLC_Msk) >> CAN_MSR_MDLC_Pos;
-	ul_datal = m_pCan->CAN_MB[uc_index].CAN_MDL;
+    rxframe->time   = (ul_status & CAN_MSR_MTIMESTAMP_Msk);
+    ul_datal = m_pCan->CAN_MB[uc_index].CAN_MDL;
 	ul_datah = m_pCan->CAN_MB[uc_index].CAN_MDH;
 
 	rxframe->data.high = ul_datah;
@@ -1032,6 +1033,7 @@ uint32_t CANRaw::get_rx_buff(CAN_FRAME& buffer) {
 	buffer.id = rx_frame_buff[rx_buffer_tail].id;
 	buffer.extended = rx_frame_buff[rx_buffer_tail].extended;
 	buffer.length = rx_frame_buff[rx_buffer_tail].length;
+	buffer.time   = rx_frame_buff[rx_buffer_tail].time;
 	buffer.data.value = rx_frame_buff[rx_buffer_tail].data.value;
 	rx_buffer_tail = (rx_buffer_tail + 1) % SIZE_RX_BUFFER;
 	return 1;

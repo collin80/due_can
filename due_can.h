@@ -164,6 +164,7 @@ typedef struct
 	uint8_t rtr;		// Remote Transmission Request
 	uint8_t priority;	// Priority but only important for TX frames and then only for special uses.
 	uint8_t extended;	// Extended ID flag
+    uint16_t time;      // CAN timer value when mailbox message was received.
 	uint8_t length;		// Number of data bytes
 	BytesUnion data;	// 64 bits - lots of ways to access it.
 } CAN_FRAME;
