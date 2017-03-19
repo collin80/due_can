@@ -36,8 +36,8 @@
 #define CAN		Can0
 #define CAN2	Can1
 
-#define CAN0_EN  50 //these enable pins match most all recent EVTV boards (EVTVDue, CAN Due 2.0)
-#define CAN1_EN  48 //they're only defaults, you can set whichever pin you need when calling begin()
+#define CAN0_EN  62 //these enable pins re only defaults, you can set whichever pin you need when calling begin()
+#define CAN1_EN  65
 
 /** Define the Mailbox mask for eight mailboxes. */
 #define GLOBAL_MAILBOX_MASK           0x000000ff
@@ -47,16 +47,16 @@
 
 /** Define the typical baudrate for CAN communication. */
 #ifdef CAN_BPS_500K
-#undef CAN_BPS_1000K 
-#undef CAN_BPS_800K                 
-#undef CAN_BPS_500K                 
-#undef CAN_BPS_250K                 
-#undef CAN_BPS_125K                  
-#undef CAN_BPS_50K                   
-#undef CAN_BPS_33333				  
-#undef CAN_BPS_25K                   
-#undef CAN_BPS_10K                   
-#undef CAN_BPS_5K                   
+#undef CAN_BPS_1000K
+#undef CAN_BPS_800K
+#undef CAN_BPS_500K
+#undef CAN_BPS_250K
+#undef CAN_BPS_125K
+#undef CAN_BPS_50K
+#undef CAN_BPS_33333
+#undef CAN_BPS_25K
+#undef CAN_BPS_10K
+#undef CAN_BPS_5K
 #endif
 
 #define CAN_BPS_1000K	1000000
@@ -173,18 +173,18 @@ class CANListener
 {
 public:
 	CANListener();
-	
+
 	virtual void gotFrame(CAN_FRAME *frame, int mailbox);
 
   	void attachMBHandler(uint8_t mailBox);
 	void detachMBHandler(uint8_t mailBox);
 	void attachGeneralHandler();
 	void detachGeneralHandler();
-	
+
 private:
 	int callbacksActive; //bitfield letting the code know which callbacks to actually try to use (for object oriented callbacks only)
-	
-	friend class CANRaw; //class has to have access to the the guts of this one 
+
+	friend class CANRaw; //class has to have access to the the guts of this one
 };
 
 class CANRaw
@@ -205,12 +205,12 @@ class CANRaw
 
 	uint8_t enablePin;
 	uint32_t busSpeed; //what speed is the bus currently initialized at? 0 if it is off right now
-	
+
 	uint32_t write_id; //public storage for an id. Will be used by the write function to set which ID to send to.
 	bool bigEndian;
 
 	void (*cbCANFrame[9])(CAN_FRAME *); //8 mailboxes plus an optional catch all
-	CANListener *listener[SIZE_LISTENERS];	
+	CANListener *listener[SIZE_LISTENERS];
 
   public:
 
@@ -247,11 +247,11 @@ class CANRaw
 
 	void setCallback(int mailbox, void (*cb)(CAN_FRAME *));
 	void setGeneralCallback(void (*cb)(CAN_FRAME *));
-	//note that these below versions still use mailbox number. There isn't a good way around this. 
+	//note that these below versions still use mailbox number. There isn't a good way around this.
 	void attachCANInterrupt(void (*cb)(CAN_FRAME *)); //alternative callname for setGeneralCallback
 	void attachCANInterrupt(uint8_t mailBox, void (*cb)(CAN_FRAME *));
 	void detachCANInterrupt(uint8_t mailBox);
-	
+
 	//now, object oriented versions to make OO projects easier
 	boolean attachObj(CANListener *listener);
 	boolean detachObj(CANListener *listener);
@@ -263,7 +263,7 @@ class CANRaw
 
 	uint32_t get_rx_buff(CAN_FRAME &);
 	uint32_t read(CAN_FRAME &);
-	
+
 	//misc old cruft kept around just in case anyone actually used any of it in older code.
 	//some are used within the functions above. Unless you really know of a good reason to use
 	//any of these you probably should steer clear of them.
