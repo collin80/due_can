@@ -193,7 +193,7 @@ uint32_t CANRaw::init(uint32_t ul_baudrate)
 	//and can send callbacks into user code which could also be long and complicated.
 	//But, keep in mind that user code in callbacks runs in interrupt context
 	//but can still be preempted at any time.
-	NVIC_SetPriority(m_pCan == CAN0 ? CAN0_IRQn : CAN1_IRQn, 12); 
+	NVIC_SetPriority(m_pCan == CAN0 ? CAN0_IRQn : CAN1_IRQn, 10);
 	
 	NVIC_EnableIRQ(m_pCan == CAN0 ? CAN0_IRQn : CAN1_IRQn); //tell the nested interrupt controller to turn on our interrupt
 
