@@ -164,6 +164,7 @@ typedef struct
 	uint8_t rtr;		// Remote Transmission Request
 	uint8_t priority;	// Priority but only important for TX frames and then only for special uses.
 	uint8_t extended;	// Extended ID flag
+    uint16_t time;      // CAN timer value when mailbox message was received.
 	uint8_t length;		// Number of data bytes
 	BytesUnion data;	// 64 bits - lots of ways to access it.
 } CAN_FRAME;
@@ -284,8 +285,8 @@ class CANRaw
 	void disable_interrupt(uint32_t dw_mask);
 	uint32_t get_interrupt_mask();
 	uint32_t get_status();
-	uint32_t get_internal_timer_value();
-	uint32_t get_timestamp_value();
+	uint16_t get_internal_timer_value();
+	uint16_t get_timestamp_value();
 	uint8_t get_tx_error_cnt();
 	uint8_t get_rx_error_cnt();
 	void reset_internal_timer();
