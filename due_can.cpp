@@ -19,6 +19,8 @@
 
 #include "due_can.h"
 
+//Set the debugging interface for autobaud. You can switch serial ports or cause the calls to be removed entirely
+#define AUTOBAUD_DEBUG(x)  SerialUSB.print(x);
 
 /**
 * \brief constructor for the class
@@ -128,31 +130,30 @@ uint32_t CANRaw::beginAutoSpeed()
     uint32_t ret;
     
     enable_autobaud_listen_mode(); //go into listen only mode so we don't clobber the bus with a wrong speed setting
-    SerialUSB.println();
+    AUTOBAUD_DEBUG("\n");
     
     while (speeds[speedCounter] != 0)
     {        
-        SerialUSB.print("Trying CAN rate: ");
-        SerialUSB.print(speeds[speedCounter]);
+        AUTOBAUD_DEBUG("\nTrying CAN rate: ");
+        AUTOBAUD_DEBUG(speeds[speedCounter]);
         ret = init(speeds[speedCounter]);
         if (ret == 0)
         {
-            SerialUSB.println();
-            SerialUSB.println("Could not init bus at requested speed!");
+            AUTOBAUD_DEBUG("\nCould not init bus at requested speed!\n");
         }
         watchFor(); //allow any frame through
-        delay(1000); //wait one second to see if traffic shows up
+        delay(600); //wait a bit for traffic to show up
         if (numRxFrames > 0) 
         {
-            SerialUSB.println(" SUCCESS!");
-            disable_autobaud_listen_mode();
+            AUTOBAUD_DEBUG(" SUCCESS!\n\n");
+            disable_autobaud_listen_mode(); //the default is to not be in listen only
+            reset_all_mailbox(); //return mailboxes to default state
             return ret; //return the speed that succeeded
         }
-        else SerialUSB.println(" FAILURE!");
+        else AUTOBAUD_DEBUG(" FAILURE!\n"); 
         speedCounter++;
     }
-    SerialUSB.println();
-    SerialUSB.println("No speeds worked! Are you sure you're connected to a CAN bus?!");
+    AUTOBAUD_DEBUG("\nNo speeds worked! Are you sure you're connected to a CAN bus?!\n");
     disable();
     return 0; 
 }
