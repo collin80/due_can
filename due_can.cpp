@@ -427,6 +427,8 @@ bool CANRaw::removeFromRingBuffer (ringbuffer_t &ring, CAN_FRAME &msg)
 uint16_t CANRaw::ringBufferCount (ringbuffer_t &ring)
 {
     uint16_t entries;
+    
+    if (ring.tail == ring.head) return 0; //there's nothing in the buffer if they match
 
     if ( ring.tail < ring.head ) {
       entries = ring.head - ring.tail;
