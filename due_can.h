@@ -21,6 +21,9 @@
 
 #include <Arduino.h>
 
+#define DUE_CAN_MAILBOX_TX_BUFFER_SUPPORT  // helper definition for handling different FlexCAN revisions
+#define DUE_CAN_DYNAMIC_BUFFER_SUPPORT  // helper definition for handling different FlexCAN revisions
+
 //add some extra stuff that is needed for Arduino 1.5.2
 #ifndef PINS_CAN0
 	static const uint8_t CAN1RX = 88;
@@ -142,7 +145,7 @@ const can_bit_timing_t can_bit_time[] = {
 //This is architecture specific. DO NOT USE THIS UNION ON ANYTHING OTHER THAN THE CORTEX M3 / Arduino Due
 //UNLESS YOU DOUBLE CHECK THINGS!
 typedef union {
-    uint64_t value;
+  uint64_t value;
 	struct {
 		uint32_t low;
 		uint32_t high;
@@ -152,55 +155,83 @@ typedef union {
 		uint16_t s1;
 		uint16_t s2;
 		uint16_t s3;
-    };
+  };
 	uint8_t bytes[8];
 	uint8_t byte[8]; //alternate name so you can omit the s if you feel it makes more sense
 } BytesUnion;
 
 typedef struct
 {
-	uint32_t id;		// EID if ide set, SID otherwise
-	uint32_t fid;		// family ID
-	uint8_t rtr;		// Remote Transmission Request
-	uint8_t priority;	// Priority but only important for TX frames and then only for special uses.
-	uint8_t extended;	// Extended ID flag
-    uint16_t time;      // CAN timer value when mailbox message was received.
-	uint8_t length;		// Number of data bytes
-	BytesUnion data;	// 64 bits - lots of ways to access it.
+  uint32_t id;		// EID if ide set, SID otherwise
+  uint32_t fid;		// family ID
+  uint8_t rtr;		// Remote Transmission Request
+  uint8_t priority;	// Priority but only important for TX frames and then only for special uses.
+  uint8_t extended;	// Extended ID flag
+  uint16_t time;      // CAN timer value when mailbox message was received.
+  uint8_t length;		// Number of data bytes
+  BytesUnion data;	// 64 bits - lots of ways to access it.
 } CAN_FRAME;
 
 class CANListener
 {
 public:
-	CANListener();
-	
-	virtual void gotFrame(CAN_FRAME *frame, int mailbox);
+  CANListener();
 
-  	void attachMBHandler(uint8_t mailBox);
-	void detachMBHandler(uint8_t mailBox);
-	void attachGeneralHandler();
-	void detachGeneralHandler();
-	
+  virtual void gotFrame(CAN_FRAME *frame, int mailbox);
+
+  void attachMBHandler(uint8_t mailBox);
+  void detachMBHandler(uint8_t mailBox);
+  void attachGeneralHandler();
+  void detachGeneralHandler();
+
 private:
-	int callbacksActive; //bitfield letting the code know which callbacks to actually try to use (for object oriented callbacks only)
-	
-	friend class CANRaw; //class has to have access to the the guts of this one 
+  int callbacksActive; //bitfield letting the code know which callbacks to actually try to use (for object oriented callbacks only)
+
+  friend class CANRaw; //class has to have access to the the guts of this one 
 };
 
 class CANRaw
 {
-  protected:
-	int numTXBoxes; //There are 8 mailboxes, anything not TX will be set RX
+protected:
+  struct ringbuffer_t {
+    volatile uint16_t head;
+    volatile uint16_t tail;
+    uint16_t size;
+    volatile CAN_FRAME *buffer;
+  };
+ 
+protected:
+  int numTXBoxes; //There are 8 mailboxes, anything not TX will be set RX
+  uint16_t sizeRxBuffer;
+  uint16_t sizeTxBuffer;
 
-  private:
+  void initRingBuffer (ringbuffer_t &ring, volatile CAN_FRAME *buffer, uint16_t size);
+  bool addToRingBuffer (ringbuffer_t &ring, const CAN_FRAME &msg);
+  bool removeFromRingBuffer (ringbuffer_t &ring, CAN_FRAME &msg);
+  inline bool isRingBufferEmpty (ringbuffer_t &ring) { return (ring.head == ring.tail); }
+  uint16_t ringBufferCount (ringbuffer_t &ring);
+
+  void irqLock() { NVIC_DisableIRQ(nIRQ); }
+  void irqRelease() { NVIC_EnableIRQ(nIRQ); }
+
+  void initializeBuffers();
+  bool isInitialized() { return tx_frame_buff!=0; }
+    
+  bool usesGlobalTxRing(uint8_t mbox) { return (mbox<getNumMailBoxes()?txRings[mbox]==0:true); }
+  bool isTxBox(uint8_t mbox) { return (mbox>=getFirstTxBox() && mbox<getNumMailBoxes() ); }
+  
+private:
 	/* CAN peripheral, set by constructor */
-	Can* m_pCan ;
+	Can* m_pCan;
+  IRQn_Type nIRQ;
 
-	volatile CAN_FRAME rx_frame_buff[SIZE_RX_BUFFER];
-	volatile CAN_FRAME tx_frame_buff[SIZE_TX_BUFFER];
+	volatile CAN_FRAME *rx_frame_buff; //[SIZE_RX_BUFFER];
+	volatile CAN_FRAME *tx_frame_buff; //[SIZE_TX_BUFFER];
+  ringbuffer_t txRing;
+  ringbuffer_t rxRing;
+  ringbuffer_t * txRings[CANMB_NUMBER];
 
-	volatile uint16_t rx_buffer_head, rx_buffer_tail;
-	volatile uint16_t tx_buffer_head, tx_buffer_tail;
+  void writeTxRegisters(const CAN_FRAME &txFrame, uint8_t mb);
 	void mailbox_int_handler(uint8_t mb, uint32_t ul_status);
 
 	uint8_t enablePin;
@@ -212,15 +243,26 @@ class CANRaw
     uint32_t numBusErrors;
     uint32_t numRxFrames;
 
-	void (*cbCANFrame[9])(CAN_FRAME *); //8 mailboxes plus an optional catch all
+	void (*cbCANFrame[CANMB_NUMBER+1])(CAN_FRAME *); //8 mailboxes plus an optional catch all
 	CANListener *listener[SIZE_LISTENERS];	
 
-  public:
+public:
 
-    // Constructor
-    CANRaw( Can* pCan, uint32_t En);
+  // Constructor
+  CANRaw( Can* pCan, uint32_t En);
 
-	int setRXFilter(uint32_t id, uint32_t mask, bool extended);
+  // Before begin, you can define rx buffer size. Default is SIZE_RX_BUFFER. This does not have effect after begin.
+  void setRxBufferSize(uint16_t size) { if (!isInitialized() ) sizeRxBuffer=size; }
+
+  // Before begin, you can define global tx buffer size. Default is SIZE_TX_BUFFER. This does not have effect after begin.
+  void setTxBufferSize(uint16_t size) { if (!isInitialized() ) sizeTxBuffer=size; }
+
+  // You can define mailbox specific tx buffer size. This can be defined only once per mailbox.
+  // As default prioritized messages will not be buffered. If you define buffer size for mail box, the messages will be
+  // buffered to own buffer, if necessary.
+  void setMailBoxTxBufferSize(uint8_t mbox, uint16_t size);
+
+  int setRXFilter(uint32_t id, uint32_t mask, bool extended);
 	int setRXFilter(uint8_t mailbox, uint32_t id, uint32_t mask, bool extended);
 	int watchFor(); //allow anything through
 	int watchFor(uint32_t id); //allow just this ID through (automatic determination of extended status)
@@ -228,6 +270,11 @@ class CANRaw
 	int watchForRange(uint32_t id1, uint32_t id2); //try to allow the range from id1 to id2 - automatically determine base ID and mask
 
 	int setNumTXBoxes(int txboxes);
+  inline uint8_t getFirstTxBox() { return getNumMailBoxes()-numTXBoxes; }
+  inline uint8_t getLastTxBox() { return getNumMailBoxes()-1; }
+  inline uint8_t getNumMailBoxes() { return CANMB_NUMBER; }
+  inline uint8_t getNumRxBoxes() { return getNumMailBoxes()-numTXBoxes; }
+  
 	int findFreeRXMailbox();
 	uint8_t mailbox_get_mode(uint8_t uc_index);
 	uint32_t mailbox_get_id(uint8_t uc_index);
@@ -246,11 +293,12 @@ class CANRaw
 	void disable();
 
 	bool sendFrame(CAN_FRAME& txFrame);
+	bool sendFrame(CAN_FRAME& txFrame, uint8_t mbox);
 	void setWriteID(uint32_t id);
 	template <typename t> void write(t inputValue); //write a variable # of bytes out in a frame. Uses id as the ID.
 	void setBigEndian(bool);
 
-	void setCallback(int mailbox, void (*cb)(CAN_FRAME *));
+	void setCallback(uint8_t mailbox, void (*cb)(CAN_FRAME *));
 	void setGeneralCallback(void (*cb)(CAN_FRAME *));
 	//note that these below versions still use mailbox number. There isn't a good way around this. 
 	void attachCANInterrupt(void (*cb)(CAN_FRAME *)); //alternative callname for setGeneralCallback
@@ -264,10 +312,11 @@ class CANRaw
 	void reset_all_mailbox();
 	void interruptHandler();
 	bool rx_avail();
-	int available(); //like rx_avail but returns the number of waiting frames
+	uint16_t available(); //like rx_avail but returns the number of waiting frames
 
-	uint32_t get_rx_buff(CAN_FRAME &);
-	uint32_t read(CAN_FRAME &);
+	uint32_t get_rx_buff(CAN_FRAME &msg);
+  //wrapper for syntactic sugar reasons
+	inline uint32_t read(CAN_FRAME &msg) { return get_rx_buff(msg); }
 	
 	//misc old cruft kept around just in case anyone actually used any of it in older code.
 	//some are used within the functions above. Unless you really know of a good reason to use
