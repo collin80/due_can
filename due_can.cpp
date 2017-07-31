@@ -54,8 +54,7 @@ CANRaw::CANRaw(Can* pCan, uint32_t En ) {
 /**
  * \brief Configure CAN baudrate.
  *
- * \param ul_baudrate Baudrate value (kB/s), allowed values:
- *                    1000, 800, 500, 250, 125, 50, 25, 10, 5.
+ * \param ul_baudrate Baudrate value in bits per second
  *
  * \retval Set the baudrate successfully or not.
  */
@@ -283,6 +282,8 @@ uint32_t CANRaw::init(uint32_t ul_baudrate)
 		ul_tick++;
 	}
 
+	disable_autobaud_listen_mode();
+	
 	//set a fairly low priority so almost anything can preempt.
 	//this has the effect that most anything can interrupt our interrupt handler
 	//that's a good thing because the interrupt handler is long and complicated
