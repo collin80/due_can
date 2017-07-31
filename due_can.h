@@ -239,6 +239,9 @@ private:
 	
 	uint32_t write_id; //public storage for an id. Will be used by the write function to set which ID to send to.
 	bool bigEndian;
+    
+    uint32_t numBusErrors;
+    uint32_t numRxFrames;
 
 	void (*cbCANFrame[CANMB_NUMBER+1])(CAN_FRAME *); //8 mailboxes plus an optional catch all
 	CANListener *listener[SIZE_LISTENERS];	
@@ -282,6 +285,8 @@ public:
 	uint32_t begin();
 	uint32_t begin(uint32_t baudrate);
 	uint32_t begin(uint32_t baudrate, uint8_t enablePin);
+    uint32_t beginAutoSpeed();
+    uint32_t beginAutoSpeed(uint8_t enablePin);
 	uint32_t getBusSpeed();
 
 	void enable();

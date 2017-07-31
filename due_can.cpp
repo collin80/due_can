@@ -19,6 +19,8 @@
 
 #include "due_can.h"
 
+//Set the debugging interface for autobaud. You can switch serial ports or cause the calls to be removed entirely
+#define AUTOBAUD_DEBUG(x)  SerialUSB.print(x);
 
 /**
 * \brief constructor for the class
@@ -133,6 +135,48 @@ uint32_t CANRaw::begin(uint32_t baudrate, uint8_t enablePin)
 	return init(baudrate);
 }
 
+uint32_t CANRaw::beginAutoSpeed()
+{
+    //set a list of speeds to check here. Terminate that list with 0 or you'll have a bad time.
+    uint32_t speeds[] = {250000ul, 500000ul, 1000000ul, 125000ul, 33333ul, 50000ul, 800000ul, 0};
+    int speedCounter = 0;
+    uint32_t ret;
+    
+    enable_autobaud_listen_mode(); //go into listen only mode so we don't clobber the bus with a wrong speed setting
+    AUTOBAUD_DEBUG("\n");
+    
+    while (speeds[speedCounter] != 0)
+    {        
+        AUTOBAUD_DEBUG("\nTrying CAN rate: ");
+        AUTOBAUD_DEBUG(speeds[speedCounter]);
+        ret = init(speeds[speedCounter]);
+        if (ret == 0)
+        {
+            AUTOBAUD_DEBUG("\nCould not init bus at requested speed!\n");
+        }
+        watchFor(); //allow any frame through
+        delay(600); //wait a bit for traffic to show up
+        if (numRxFrames > 0) 
+        {
+            AUTOBAUD_DEBUG(" SUCCESS!\n\n");
+            disable_autobaud_listen_mode(); //the default is to not be in listen only
+            reset_all_mailbox(); //return mailboxes to default state
+            return ret; //return the speed that succeeded
+        }
+        else AUTOBAUD_DEBUG(" FAILURE!\n"); 
+        speedCounter++;
+    }
+    AUTOBAUD_DEBUG("\nNo speeds worked! Are you sure you're connected to a CAN bus?!\n");
+    disable();
+    return 0; 
+}
+
+uint32_t CANRaw::beginAutoSpeed(uint8_t enablePin)
+{
+    this->enablePin = enablePin;
+    return beginAutoSpeed();
+}
+
 uint32_t CANRaw::getBusSpeed()
 {
 	return busSpeed;
@@ -193,9 +237,8 @@ uint32_t CANRaw::init(uint32_t ul_baudrate)
   
   initializeBuffers();
 	
-	//there used to be code here to cause this function to not run if the hardware is already initialized. But,
-	//it can be helpful to reinitialize. For instance, if the bus rate was set improperly you might need to
-	//go back through this code to reset the hardware.
+	numBusErrors = 0;
+    numRxFrames = 0;
 
 	//initialize all function pointers to null
 	for (int i = 0; i < getNumMailBoxes()+1; i++) cbCANFrame[i] = 0;
@@ -1269,12 +1312,14 @@ void CANRaw::interruptHandler() {
 		mailbox_int_handler(7, ul_status);
 	}
 	if (ul_status & CAN_SR_ERRA) { //error active
+        numBusErrors++;
 	}
 	if (ul_status & CAN_SR_WARN) { //warning limit
 	}
 	if (ul_status & CAN_SR_ERRP) { //error passive
 	}
 	if (ul_status & CAN_SR_BOFF) { //bus off
+        numBusErrors++;
 	}
 	if (ul_status & CAN_SR_SLEEP) { //controller in sleep mode
 	}
@@ -1287,12 +1332,16 @@ void CANRaw::interruptHandler() {
 	if (ul_status & CAN_SR_CERR) { //CRC error in mailbox
 	}
 	if (ul_status & CAN_SR_SERR) { //stuffing error in mailbox
+        numBusErrors++;
 	}
 	if (ul_status & CAN_SR_AERR) { //ack error
+        numBusErrors++;
 	}
 	if (ul_status & CAN_SR_FERR) { //form error
+        numBusErrors++;
 	} 
 	if (ul_status & CAN_SR_BERR) { //bit error
+        numBusErrors++;
 	}  
 }
 
@@ -1469,6 +1518,7 @@ void CANRaw::mailbox_int_handler(uint8_t mb, uint32_t /* ul_status */) {
 		case 2: //receive w/ overwrite
 		case 4: //consumer - technically still a receive buffer
 			mailbox_read(mb, &tempFrame);
+            numRxFrames++;
 			//First, try to send a callback. If no callback registered then buffer the frame.
 			if (cbCANFrame[mb]) 
 			{
