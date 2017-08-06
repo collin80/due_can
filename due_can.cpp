@@ -40,7 +40,7 @@ CANRaw::CANRaw(Can* pCan, uint32_t En ) {
   
   rx_frame_buff=0;
   tx_frame_buff=0;
-  numTXBoxes=0;
+  numTXBoxes=1;
   
   sizeRxBuffer=SIZE_RX_BUFFER;
   sizeTxBuffer=SIZE_TX_BUFFER;
