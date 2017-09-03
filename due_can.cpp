@@ -942,6 +942,7 @@ bool CANRaw::sendFrame(CAN_FRAME& txFrame)
           writeTxRegisters(txFrame,mbox);
           enable_interrupt(0x01u << mbox); //enable the TX interrupt for this box
           result=true; //we've sent it. mission accomplished.
+          break;
         }
       }
     }
