@@ -489,7 +489,7 @@ boolean CANRaw::attachObj(CANListener *listener)
 		if (this->listener[i] == NULL)
 		{
 			this->listener[i] = listener;
-			listener->callbacksActive = 0;
+			listener->initialize();
 			return true;			
 		}
 	}
@@ -928,34 +928,35 @@ void CANRaw::writeTxRegisters(const CAN_FRAME &txFrame, uint8_t mb)
  */
 bool CANRaw::sendFrame(CAN_FRAME& txFrame) 
 {
-  bool result=false;
+   bool result=false;
   
-  irqLock();
+   irqLock();
   
-  if ( isRingBufferEmpty(txRing) ) { // If there is nothing buffered, find free mailbox
-  
-    for (uint8_t mbox = 0; mbox < 8; mbox++) {
-      if (((m_pCan->CAN_MB[mbox].CAN_MMR >> 24) & 7) == CAN_MB_TX_MODE)
-      {//is this mailbox set up as a TX box?
-        if ( usesGlobalTxRing(mbox) && (m_pCan->CAN_MB[mbox].CAN_MSR & CAN_MSR_MRDY) ) {
-          //is it also available (not sending anything?)
-          writeTxRegisters(txFrame,mbox);
-          enable_interrupt(0x01u << mbox); //enable the TX interrupt for this box
-          result=true; //we've sent it. mission accomplished.
-        }
+   if ( isRingBufferEmpty(txRing) ) { // If there is nothing buffered, find free mailbox
+      for (uint8_t mbox = 0; mbox < 8; mbox++) {
+         if (((m_pCan->CAN_MB[mbox].CAN_MMR >> 24) & 7) == CAN_MB_TX_MODE)
+         {//is this mailbox set up as a TX box?
+            if ( usesGlobalTxRing(mbox) && (m_pCan->CAN_MB[mbox].CAN_MSR & CAN_MSR_MRDY) ) {
+               //is it also available (not sending anything?)
+               writeTxRegisters(txFrame,mbox);
+               enable_interrupt(0x01u << mbox); //enable the TX interrupt for this box
+               result = true; //we've sent it. mission accomplished.
+               break; //no need to keep going. We sent our message
+            }
+         }
       }
-    }
-	}
+   }
   
-  if ( !result) {
-    //no free mailbox was found above
-    //so, queue the frame if possible. But, don't increment the 
-    //tail if it would smash into the head and kill the queue.
-    result=addToRingBuffer(txRing,txFrame);
-  }
-  irqRelease();
-    
-	return result;
+   if ( !result) {
+      //no free mailbox was found above
+      //so, queue the frame if possible. But, don't increment the 
+      //tail if it would smash into the head and kill the queue.
+      result=addToRingBuffer(txRing,txFrame);
+   }
+
+   irqRelease();
+
+   return result;
 }
 
 /**
@@ -1540,12 +1541,12 @@ void CANRaw::mailbox_int_handler(uint8_t mb, uint32_t /* ul_status */) {
 					thisListener = listener[listenerPos];
 					if (thisListener != NULL)
 					{
-						if (thisListener->callbacksActive & (1 << mb)) 
+						if (thisListener->isCallbackActive(mb)) 
 						{
 							caughtFrame = true;
 							thisListener->gotFrame(&tempFrame, mb);
 						}
-						else if (thisListener->callbacksActive & 256) 
+						else if (thisListener->isCallbackActive(8)) //global catch-all 
 						{
 							caughtFrame = true;
 							thisListener->gotFrame(&tempFrame, -1);
@@ -1555,61 +1556,23 @@ void CANRaw::mailbox_int_handler(uint8_t mb, uint32_t /* ul_status */) {
 			}
 			if (!caughtFrame) //if none of the callback types caught this frame then queue it in the buffer
 			{
-        addToRingBuffer(rxRing,tempFrame);
+               addToRingBuffer(rxRing,tempFrame);
 			}
 			break;
 		case 3: //transmit
-      pRing=( usesGlobalTxRing(mb) ? &txRing : txRings[mb] );
-      if ( removeFromRingBuffer(*pRing, tempFrame) ) { //if there is a frame in the queue to send
-        writeTxRegisters(tempFrame,mb);
-			}
-			else {
-				disable_interrupt(0x01 << mb);
-			}
-			break;
+           pRing=( usesGlobalTxRing(mb) ? &txRing : txRings[mb] );
+           if ( removeFromRingBuffer(*pRing, tempFrame) ) { //if there is a frame in the queue to send
+              writeTxRegisters(tempFrame,mb);
+		   }
+		   else {
+		      disable_interrupt(0x01 << mb);
+		   }
+		   break;
 		case 5: //producer - technically still a transmit buffer
-			break;
+		   break;
 		}
 	}
 }
-
-CANListener::CANListener()
-{
-	callbacksActive = 0; //none. Bitfield were bits 0-7 are the mailboxes and bit 8 is the general callback
-}
-
-//an empty version so that the linker doesn't complain that no implementation exists.
-void CANListener::gotFrame(CAN_FRAME */*frame*/, int /*mailbox*/)
-{
-  
-}
-
-void CANListener::attachMBHandler(uint8_t mailBox)
-{
-	if ( mailBox < CANMB_NUMBER )
-	{
-		callbacksActive |= (1<<mailBox);
-	}
-}
-
-void CANListener::detachMBHandler(uint8_t mailBox)
-{
-	if ( mailBox < CANMB_NUMBER )
-	{
-		callbacksActive &= ~(1<<mailBox);
-	}  
-}
-
-void CANListener::attachGeneralHandler()
-{
-	callbacksActive |= 256;
-}
-
-void CANListener::detachGeneralHandler()
-{
-	callbacksActive &= ~256;
-}
-
 
 /**
  * \brief Interrupt dispatchers - Never directly call these

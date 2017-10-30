@@ -20,6 +20,7 @@
 #define _CAN_LIBRARY_
 
 #include <Arduino.h>
+#include <can_common.h>
 
 #define DUE_CAN_MAILBOX_TX_BUFFER_SUPPORT  // helper definition for handling different FlexCAN revisions
 #define DUE_CAN_DYNAMIC_BUFFER_SUPPORT  // helper definition for handling different FlexCAN revisions
@@ -47,31 +48,6 @@
 
 /** Disable all interrupt mask */
 #define CAN_DISABLE_ALL_INTERRUPT_MASK 0xffffffff
-
-/** Define the typical baudrate for CAN communication. */
-#ifdef CAN_BPS_500K
-#undef CAN_BPS_1000K 
-#undef CAN_BPS_800K                 
-#undef CAN_BPS_500K                 
-#undef CAN_BPS_250K                 
-#undef CAN_BPS_125K                  
-#undef CAN_BPS_50K                   
-#undef CAN_BPS_33333				  
-#undef CAN_BPS_25K                   
-#undef CAN_BPS_10K                   
-#undef CAN_BPS_5K                   
-#endif
-
-#define CAN_BPS_1000K	1000000
-#define CAN_BPS_800K	800000
-#define CAN_BPS_500K	500000
-#define CAN_BPS_250K	250000
-#define CAN_BPS_125K	125000
-#define CAN_BPS_50K		50000
-#define CAN_BPS_33333	33333
-#define CAN_BPS_25K		25000
-#define CAN_BPS_10K		10000
-#define CAN_BPS_5K		5000
 
 #define CAN_DEFAULT_BAUD	CAN_BPS_250K
 
@@ -141,54 +117,6 @@ const can_bit_timing_t can_bit_time[] = {
 	{23,  (7 + 1), (7 + 1), (6 + 1), (2 + 1), 70},
 	{24,  (6 + 1), (7 + 1), (7 + 1), (2 + 1), 67},
 	{25,  (7 + 1), (7 + 1), (7 + 1), (2 + 1), 68}
-};
-
-//This is architecture specific. DO NOT USE THIS UNION ON ANYTHING OTHER THAN THE CORTEX M3 / Arduino Due
-//UNLESS YOU DOUBLE CHECK THINGS!
-typedef union {
-  uint64_t value;
-	struct {
-		uint32_t low;
-		uint32_t high;
-	};
-	struct {
-		uint16_t s0;
-		uint16_t s1;
-		uint16_t s2;
-		uint16_t s3;
-  };
-	uint8_t bytes[8];
-	uint8_t byte[8]; //alternate name so you can omit the s if you feel it makes more sense
-} BytesUnion;
-
-typedef struct
-{
-  uint32_t id;		// EID if ide set, SID otherwise
-  uint32_t fid;		// family ID
-  uint8_t rtr;		// Remote Transmission Request
-  uint8_t priority;	// Priority but only important for TX frames and then only for special uses.
-  uint8_t extended;	// Extended ID flag
-  uint16_t time;      // CAN timer value when mailbox message was received.
-  uint8_t length;		// Number of data bytes
-  BytesUnion data;	// 64 bits - lots of ways to access it.
-} CAN_FRAME;
-
-class CANListener
-{
-public:
-  CANListener();
-
-  virtual void gotFrame(CAN_FRAME *frame, int mailbox);
-
-  void attachMBHandler(uint8_t mailBox);
-  void detachMBHandler(uint8_t mailBox);
-  void attachGeneralHandler();
-  void detachGeneralHandler();
-
-private:
-  int callbacksActive; //bitfield letting the code know which callbacks to actually try to use (for object oriented callbacks only)
-
-  friend class CANRaw; //class has to have access to the the guts of this one 
 };
 
 class CANRaw
