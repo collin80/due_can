@@ -118,16 +118,6 @@ uint32_t CANRaw::set_baudrate(uint32_t ul_baudrate)
 }
 
 
-uint32_t CANRaw::begin()
-{
-	return init(CAN_DEFAULT_BAUD);
-}
-
-uint32_t CANRaw::begin(uint32_t baudrate) 
-{
-	return init(baudrate);
-}
-
 uint32_t CANRaw::begin(uint32_t baudrate, uint8_t enablePin) 
 {
 	this->enablePin = enablePin;
@@ -174,11 +164,6 @@ uint32_t CANRaw::beginAutoSpeed(uint8_t enablePin)
 {
     this->enablePin = enablePin;
     return beginAutoSpeed();
-}
-
-uint32_t CANRaw::getBusSpeed()
-{
-	return busSpeed;
 }
 
 /*
@@ -480,33 +465,6 @@ void CANRaw::detachCANInterrupt(uint8_t mailBox)
 {
 	if ( mailBox >= getNumMailBoxes() ) return;
 	cbCANFrame[mailBox] = 0;
-}
-
-boolean CANRaw::attachObj(CANListener *listener)
-{
-	for (int i = 0; i < SIZE_LISTENERS; i++)
-	{
-		if (this->listener[i] == NULL)
-		{
-			this->listener[i] = listener;
-			listener->initialize();
-			return true;			
-		}
-	}
-	return false;
-}
-
-boolean CANRaw::detachObj(CANListener *listener)
-{
-	for (int i = 0; i < SIZE_LISTENERS; i++)
-	{
-		if (this->listener[i] == listener)
-		{
-			this->listener[i] = NULL;			
-			return true;			
-		}
-	}
-	return false;  
 }
 
 /**
@@ -1415,65 +1373,6 @@ int CANRaw::watchFor()
 
 	return retVal;
 }
-
-//Let a single frame ID through. Automatic determination of extended. Also automatically sets mask
-int CANRaw::watchFor(uint32_t id)
-{
-	if (id > 0x7FF) return setRXFilter(id, 0x1FFFFFFF, true);
-	else return setRXFilter(id, 0x7FF, false);
-}
-
-//Allow a range of IDs through based on mask. Still auto determines extended.
-int CANRaw::watchFor(uint32_t id, uint32_t mask)
-{
-	if (id > 0x7FF) return setRXFilter(id, mask, true);
-	else return setRXFilter(id, mask, false);
-}
-
-//A bit more complicated. Makes sure that the range from id1 to id2 is let through. This might open
-//the floodgates if you aren't careful.
-//There are undoubtedly better ways to calculate the proper values for the filter but this way seems to work.
-//It'll be kind of slow if you try to let a huge span through though.
-int CANRaw::watchForRange(uint32_t id1, uint32_t id2)
-{
-	uint32_t id = 0;
-	uint32_t mask = 0;
-	uint32_t temp;
-
-	if (id1 > id2) 
-	{   //looks funny I know. In place swap with no temporary storage. Neato!
-		id1 = id1 ^ id2;
-		id2 = id1 ^ id2; //note difference here.
-		id1 = id1 ^ id2;
-	}
-
-	id = id1;
-
-	if (id2 <= 0x7FF) mask = 0x7FF;
-	else mask = 0x1FFFFFFF;
-
-	/* Here is a quick overview of the theory behind these calculations.
-	   We start with mask set to 11 or 29 set bits (all 1's)
-	   and id set to the lowest ID in the range.
-	   From there we go through every single ID possible in the range. For each ID
-	   we AND with the current ID. At the end only bits that never changed and were 1's
-	   will still be 1's. This yields the ID we can match against to let these frames through
-	   The mask is calculated by finding the bitfield difference between the lowest ID and
-	   the current ID. This calculation will be 1 anywhere the bits were different. We invert
-	   this so that it is 1 anywhere the bits where the same. Then we AND with the current Mask.
-	   At the end the mask will be 1 anywhere the bits never changed. This is the perfect mask.
-	*/
-	for (uint32_t c = id1; c <= id2; c++)
-	{
-		id &= c;
-		temp = (~(id1 ^ c)) & 0x1FFFFFFF;
-		mask &= temp;
-	}
-	//output of the above crazy loop is actually the end result.
-	if (id > 0x7FF) return setRXFilter(id, mask, true);
-	else return setRXFilter(id, mask, false);
-}
-
 
 /*
  * Get the IER (interrupt mask) for the specified mailbox index.

@@ -49,8 +49,6 @@
 /** Disable all interrupt mask */
 #define CAN_DISABLE_ALL_INTERRUPT_MASK 0xffffffff
 
-#define CAN_DEFAULT_BAUD	CAN_BPS_250K
-
 /** Define the mailbox mode. */
 #define CAN_MB_DISABLE_MODE           0
 #define CAN_MB_RX_MODE                1
@@ -67,7 +65,6 @@
 
 #define SIZE_RX_BUFFER	32 //RX incoming ring buffer is this big
 #define SIZE_TX_BUFFER	16 //TX ring buffer is this big
-#define SIZE_LISTENERS	4 //number of classes that can register as listeners with this class
 
 	/** Define the timemark mask. */
 #define TIMEMARK_MASK              0x0000ffff
@@ -119,7 +116,7 @@ const can_bit_timing_t can_bit_time[] = {
 	{25,  (7 + 1), (7 + 1), (7 + 1), (2 + 1), 68}
 };
 
-class CANRaw
+class CANRaw: public CAN_COMMON
 {
 protected:
   struct ringbuffer_t {
@@ -164,7 +161,6 @@ private:
 	void mailbox_int_handler(uint8_t mb, uint32_t ul_status);
 
 	uint8_t enablePin;
-	uint32_t busSpeed; //what speed is the bus currently initialized at? 0 if it is off right now
 	
 	uint32_t write_id; //public storage for an id. Will be used by the write function to set which ID to send to.
 	bool bigEndian;
@@ -172,80 +168,71 @@ private:
     uint32_t numBusErrors;
     uint32_t numRxFrames;
 
-	void (*cbCANFrame[CANMB_NUMBER+1])(CAN_FRAME *); //8 mailboxes plus an optional catch all
-	CANListener *listener[SIZE_LISTENERS];	
+    void (*cbCANFrame[CANMB_NUMBER+1])(CAN_FRAME *); //8 mailboxes plus an optional catch all
 
 public:
 
-  // Constructor
-  CANRaw( Can* pCan, uint32_t En);
+    // Constructor
+    CANRaw( Can* pCan, uint32_t En);
 
-  // Before begin, you can define rx buffer size. Default is SIZE_RX_BUFFER. This does not have effect after begin.
-  void setRxBufferSize(uint16_t size) { if (!isInitialized() ) sizeRxBuffer=size; }
+    // Before begin, you can define rx buffer size. Default is SIZE_RX_BUFFER. This does not have effect after begin.
+    void setRxBufferSize(uint16_t size) { if (!isInitialized() ) sizeRxBuffer=size; }
 
-  // Before begin, you can define global tx buffer size. Default is SIZE_TX_BUFFER. This does not have effect after begin.
-  void setTxBufferSize(uint16_t size) { if (!isInitialized() ) sizeTxBuffer=size; }
+    // Before begin, you can define global tx buffer size. Default is SIZE_TX_BUFFER. This does not have effect after begin.
+    void setTxBufferSize(uint16_t size) { if (!isInitialized() ) sizeTxBuffer=size; }
 
-  // You can define mailbox specific tx buffer size. This can be defined only once per mailbox.
-  // As default prioritized messages will not be buffered. If you define buffer size for mail box, the messages will be
-  // buffered to own buffer, if necessary.
-  void setMailBoxTxBufferSize(uint8_t mbox, uint16_t size);
+    // You can define mailbox specific tx buffer size. This can be defined only once per mailbox.
+    // As default prioritized messages will not be buffered. If you define buffer size for mail box, the messages will be
+    // buffered to own buffer, if necessary.
+    void setMailBoxTxBufferSize(uint8_t mbox, uint16_t size);
 
-  int setRXFilter(uint32_t id, uint32_t mask, bool extended);
-	int setRXFilter(uint8_t mailbox, uint32_t id, uint32_t mask, bool extended);
-	int watchFor(); //allow anything through
-	int watchFor(uint32_t id); //allow just this ID through (automatic determination of extended status)
-	int watchFor(uint32_t id, uint32_t mask); //allow a range of ids through
-	int watchForRange(uint32_t id1, uint32_t id2); //try to allow the range from id1 to id2 - automatically determine base ID and mask
 
-	int setNumTXBoxes(int txboxes);
-  inline uint8_t getFirstTxBox() { return getNumMailBoxes()-numTXBoxes; }
-  inline uint8_t getLastTxBox() { return getNumMailBoxes()-1; }
-  inline uint8_t getNumMailBoxes() { return CANMB_NUMBER; }
-  inline uint8_t getNumRxBoxes() { return getNumMailBoxes()-numTXBoxes; }
+    int setNumTXBoxes(int txboxes);
+    inline uint8_t getFirstTxBox() { return getNumMailBoxes()-numTXBoxes; }
+    inline uint8_t getLastTxBox() { return getNumMailBoxes()-1; }
+    inline uint8_t getNumMailBoxes() { return CANMB_NUMBER; }
+    inline uint8_t getNumRxBoxes() { return getNumMailBoxes()-numTXBoxes; }
   
 	int findFreeRXMailbox();
 	uint8_t mailbox_get_mode(uint8_t uc_index);
 	uint32_t mailbox_get_id(uint8_t uc_index);
 	uint32_t getMailboxIer(int8_t mailbox);
-	uint32_t set_baudrate(uint32_t ul_baudrate);
 
-	uint32_t init(uint32_t ul_baudrate);
-	uint32_t begin();
-	uint32_t begin(uint32_t baudrate);
-	uint32_t begin(uint32_t baudrate, uint8_t enablePin);
-    uint32_t beginAutoSpeed();
-    uint32_t beginAutoSpeed(uint8_t enablePin);
-	uint32_t getBusSpeed();
-
-	void enable();
-	void disable();
-
-	bool sendFrame(CAN_FRAME& txFrame);
 	bool sendFrame(CAN_FRAME& txFrame, uint8_t mbox);
 	void setWriteID(uint32_t id);
 	template <typename t> void write(t inputValue); //write a variable # of bytes out in a frame. Uses id as the ID.
 	void setBigEndian(bool);
 
+	void reset_all_mailbox();
+	void interruptHandler();
+
+    //declaration of all the functions we need to override from CAN_COMMON
+    int setRXFilter(uint32_t id, uint32_t mask, bool extended);
+	int setRXFilter(uint8_t mailbox, uint32_t id, uint32_t mask, bool extended);
+	int watchFor(); //allow anything through
+	uint32_t init(uint32_t ul_baudrate);
+	uint32_t begin(uint32_t baudrate, uint8_t enablePin);
+    uint32_t beginAutoSpeed();
+    uint32_t beginAutoSpeed(uint8_t enablePin);
+    uint32_t set_baudrate(uint32_t ul_baudrate);
+
+	void enable();
+	void disable();
+
+	bool sendFrame(CAN_FRAME& txFrame);
+
 	void setCallback(uint8_t mailbox, void (*cb)(CAN_FRAME *));
 	void setGeneralCallback(void (*cb)(CAN_FRAME *));
-	//note that these below versions still use mailbox number. There isn't a good way around this. 
 	void attachCANInterrupt(void (*cb)(CAN_FRAME *)); //alternative callname for setGeneralCallback
 	void attachCANInterrupt(uint8_t mailBox, void (*cb)(CAN_FRAME *));
 	void detachCANInterrupt(uint8_t mailBox);
 	
-	//now, object oriented versions to make OO projects easier
-	boolean attachObj(CANListener *listener);
-	boolean detachObj(CANListener *listener);
 
-	void reset_all_mailbox();
-	void interruptHandler();
 	bool rx_avail();
 	uint16_t available(); //like rx_avail but returns the number of waiting frames
 
 	uint32_t get_rx_buff(CAN_FRAME &msg);
-  //wrapper for syntactic sugar reasons
-	inline uint32_t read(CAN_FRAME &msg) { return get_rx_buff(msg); }
+
 	
 	//misc old cruft kept around just in case anyone actually used any of it in older code.
 	//some are used within the functions above. Unless you really know of a good reason to use
