@@ -168,7 +168,7 @@ private:
     uint32_t numBusErrors;
     uint32_t numRxFrames;
 
-    void (*cbCANFrame[CANMB_NUMBER+1])(CAN_FRAME *); //8 mailboxes plus an optional catch all
+    void (*cbCANFrame[CANMB_NUMBER])(CAN_FRAME *); //8 mailboxes
 
 public:
 
@@ -222,8 +222,6 @@ public:
 	bool sendFrame(CAN_FRAME& txFrame);
 
 	void setCallback(uint8_t mailbox, void (*cb)(CAN_FRAME *));
-	void setGeneralCallback(void (*cb)(CAN_FRAME *));
-	void attachCANInterrupt(void (*cb)(CAN_FRAME *)); //alternative callname for setGeneralCallback
 	void attachCANInterrupt(uint8_t mailBox, void (*cb)(CAN_FRAME *));
 	void detachCANInterrupt(uint8_t mailBox);
 	

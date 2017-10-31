@@ -439,23 +439,6 @@ void CANRaw::setCallback(uint8_t mailbox, void (*cb)(CAN_FRAME *))
 	cbCANFrame[mailbox] = cb;
 }
 
-/**
- * \brief Set up a general callback that will be used if no callback was registered for receiving mailbox
- *
- * \param cb A function pointer to a function with prototype "void functionname(CAN_FRAME *frame);"
- *
- * \note If this function is used to set up a callback then no buffering of frames will ever take place.
- */
-void CANRaw::setGeneralCallback(void (*cb)(CAN_FRAME *))
-{
-	cbCANFrame[8] = cb;
-}
-
-void CANRaw::attachCANInterrupt(void (*cb)(CAN_FRAME *)) 
-{
-	setGeneralCallback(cb);
-}
-
 void CANRaw::attachCANInterrupt(uint8_t mailBox, void (*cb)(CAN_FRAME *)) 
 {
 	setCallback(mailBox, cb);
@@ -1428,10 +1411,10 @@ void CANRaw::mailbox_int_handler(uint8_t mb, uint32_t /* ul_status */) {
 				caughtFrame = true;
 				(*cbCANFrame[mb])(&tempFrame);
 			}
-			else if (cbCANFrame[8]) 
+			else if (cbGeneral) 
 			{
 				caughtFrame = true;
-				(*cbCANFrame[8])(&tempFrame);
+				(*cbGeneral)(&tempFrame);
 			}
 			else
 			{
