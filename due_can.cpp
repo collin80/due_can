@@ -29,7 +29,7 @@
 * \param Rs pin to use for transceiver Rs control
 * \param En pin to use for transceiver enable
 */
-CANRaw::CANRaw(Can* pCan, uint32_t En ) {
+CANRaw::CANRaw(Can* pCan, uint32_t En ) : CAN_COMMON(8){
 	m_pCan = pCan;
   nIRQ=(m_pCan == CAN0 ? CAN0_IRQn : CAN1_IRQn);
 	enablePin = En;
@@ -426,28 +426,10 @@ uint16_t CANRaw::ringBufferCount (ringbuffer_t &ring)
     return (entries);
 }
 
-/**
- * \brief Set up a callback function for given mailbox
- *
- * \param mailbox Which mailbox (0-7) to assign callback to.
- * \param cb A function pointer to a function with prototype "void functionname(CAN_FRAME *frame);"
- *
- */
-void CANRaw::setCallback(uint8_t mailbox, void (*cb)(CAN_FRAME *))
+void CANRaw::setListenOnlyMode(bool state) 
 {
-	if ( mailbox >= getNumMailBoxes() ) return;
-	cbCANFrame[mailbox] = cb;
-}
-
-void CANRaw::attachCANInterrupt(uint8_t mailBox, void (*cb)(CAN_FRAME *)) 
-{
-	setCallback(mailBox, cb);
-}
-
-void CANRaw::detachCANInterrupt(uint8_t mailBox)
-{
-	if ( mailBox >= getNumMailBoxes() ) return;
-	cbCANFrame[mailBox] = 0;
+    if (state) enable_autobaud_listen_mode();
+	else disable_autobaud_listen_mode();
 }
 
 /**
