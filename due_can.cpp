@@ -117,13 +117,6 @@ uint32_t CANRaw::set_baudrate(uint32_t ul_baudrate)
 	return 1;
 }
 
-
-uint32_t CANRaw::begin(uint32_t baudrate, uint8_t enablePin) 
-{
-	this->enablePin = enablePin;
-	return init(baudrate);
-}
-
 uint32_t CANRaw::beginAutoSpeed()
 {
     //set a list of speeds to check here. Terminate that list with 0 or you'll have a bad time.
@@ -160,12 +153,6 @@ uint32_t CANRaw::beginAutoSpeed()
     return 0; 
 }
 
-uint32_t CANRaw::beginAutoSpeed(uint8_t enablePin)
-{
-    this->enablePin = enablePin;
-    return beginAutoSpeed();
-}
-
 /*
  * \brief 
  *
@@ -174,7 +161,6 @@ uint32_t CANRaw::beginAutoSpeed(uint8_t enablePin)
  * \retval None.
  *
  */
-
 void CANRaw::setMailBoxTxBufferSize(uint8_t mbox, uint16_t size) {
   if ( mbox>=getNumMailBoxes() || txRings[mbox]!=0 ) return;
     
@@ -1317,26 +1303,13 @@ int CANRaw::setRXFilter(uint32_t id, uint32_t mask, bool extended) {
 *
 * \retval Mailbox number if successful or -1 on failure
 */
-int CANRaw::setRXFilter(uint8_t mailbox, uint32_t id, uint32_t mask, bool extended) {
+int CANRaw::setMBFilter(uint8_t mailbox, uint32_t id, uint32_t mask, bool extended) {
 	if ( mailbox >= getNumMailBoxes() ) return -1;
 
 	mailbox_set_accept_mask(mailbox, mask, extended);
 	mailbox_set_id(mailbox, id, extended);
 	enable_interrupt(getMailboxIer(mailbox));
 	return mailbox;
-}
-
-//set up to allow everything through. Sets up two mailboxes and returns the first one
-//Not a terribly good idea to call because it totally ignores most everything and just
-//quickly sets things up for all in. But, it's perfect for the novice getting started.
-int CANRaw::watchFor() 
-{
-	int retVal = setRXFilter(0, 0, 0, false);
-	enable_interrupt(getMailboxIer(0));
-	setRXFilter(1, 0, 0, true);
-	enable_interrupt(getMailboxIer(1));
-
-	return retVal;
 }
 
 /*

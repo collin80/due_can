@@ -154,23 +154,16 @@ public:
 
     //declaration of all the functions we need to override from CAN_COMMON
     int setRXFilter(uint32_t id, uint32_t mask, bool extended);
-	int setRXFilter(uint8_t mailbox, uint32_t id, uint32_t mask, bool extended);
-	int watchFor(); //allow anything through
+	int setMBFilter(uint8_t mailbox, uint32_t id, uint32_t mask, bool extended);
 	uint32_t init(uint32_t ul_baudrate);
-	uint32_t begin(uint32_t baudrate, uint8_t enablePin);
     uint32_t beginAutoSpeed();
-    uint32_t beginAutoSpeed(uint8_t enablePin);
     uint32_t set_baudrate(uint32_t ul_baudrate);
     void setListenOnlyMode(bool state);
-
 	void enable();
 	void disable();
-
 	bool sendFrame(CAN_FRAME& txFrame);
-
 	bool rx_avail();
 	uint16_t available(); //like rx_avail but returns the number of waiting frames
-
 	uint32_t get_rx_buff(CAN_FRAME &msg);
 	
 	//misc old cruft kept around just in case anyone actually used any of it in older code.
