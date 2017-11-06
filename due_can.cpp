@@ -1387,6 +1387,7 @@ void CANRaw::mailbox_int_handler(uint8_t mb, uint32_t /* ul_status */) {
 		case 4: //consumer - technically still a receive buffer
 			mailbox_read(mb, &tempFrame);
             numRxFrames++;
+
 			//First, try to send a callback. If no callback registered then buffer the frame.
 			if (cbCANFrame[mb]) 
 			{
