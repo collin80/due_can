@@ -1281,7 +1281,7 @@ int CANRaw::findFreeRXMailbox() {
 *
 * \ret number of mailbox we just used (or -1 if there are no free boxes to use)
 */
-int CANRaw::setRXFilter(uint32_t id, uint32_t mask, bool extended) {
+int CANRaw::_setFilter(uint32_t id, uint32_t mask, bool extended) {
 	int c = findFreeRXMailbox();
 	if (c < 0) return -1;
 
@@ -1303,7 +1303,7 @@ int CANRaw::setRXFilter(uint32_t id, uint32_t mask, bool extended) {
 *
 * \retval Mailbox number if successful or -1 on failure
 */
-int CANRaw::setMBFilter(uint8_t mailbox, uint32_t id, uint32_t mask, bool extended) {
+int CANRaw::_setFilterSpecific(uint8_t mailbox, uint32_t id, uint32_t mask, bool extended) {
 	if ( mailbox >= getNumMailBoxes() ) return -1;
 
 	mailbox_set_accept_mask(mailbox, mask, extended);
