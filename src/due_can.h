@@ -240,15 +240,17 @@ protected:
 private:
 	/* CAN peripheral, set by constructor */
 	Can* m_pCan;
-  IRQn_Type nIRQ;
+    IRQn_Type nIRQ;
 
 	volatile CAN_FRAME *rx_frame_buff; //[SIZE_RX_BUFFER];
 	volatile CAN_FRAME *tx_frame_buff; //[SIZE_TX_BUFFER];
-  ringbuffer_t txRing;
-  ringbuffer_t rxRing;
-  ringbuffer_t * txRings[CANMB_NUMBER];
+    ringbuffer_t txRing;
+    ringbuffer_t rxRing;
+    ringbuffer_t * txRings[CANMB_NUMBER];
 
-  void writeTxRegisters(const CAN_FRAME &txFrame, uint8_t mb);
+    void writeTxRegisters(const CAN_FRAME &txFrame, uint8_t mb);
+	void setModeBit(uint32_t bit);
+	void unsetModeBit(uint32_t bit);
 	void mailbox_int_handler(uint8_t mb, uint32_t ul_status);
 
 	uint8_t enablePin;

@@ -44,6 +44,9 @@ CANRaw::CANRaw(Can* pCan, uint32_t En ) : CAN_COMMON(8){
   
   sizeRxBuffer=SIZE_RX_BUFFER;
   sizeTxBuffer=SIZE_TX_BUFFER;
+
+  disable_autobaud_listen_mode();
+  m_pCan->CAN_MR &= ~CAN_MR_CANEN;
   
   // Initialize all message box spesific ring buffers to 0.
   for (uint8_t i=0; i<getNumMailBoxes(); i++) {
@@ -119,38 +122,53 @@ uint32_t CANRaw::set_baudrate(uint32_t ul_baudrate)
 
 uint32_t CANRaw::beginAutoSpeed()
 {
-    //set a list of speeds to check here. Terminate that list with 0 or you'll have a bad time.
-    uint32_t speeds[] = {250000ul, 500000ul, 1000000ul, 125000ul, 33333ul, 50000ul, 800000ul, 0};
-    int speedCounter = 0;
-    uint32_t ret;
-    
-    enable_autobaud_listen_mode(); //go into listen only mode so we don't clobber the bus with a wrong speed setting
-    AUTOBAUD_DEBUG("\n");
-    
-    while (speeds[speedCounter] != 0)
-    {        
-        AUTOBAUD_DEBUG("\nTrying CAN rate: ");
-        AUTOBAUD_DEBUG(speeds[speedCounter]);
-        ret = init(speeds[speedCounter]);
-        if (ret == 0)
-        {
-            AUTOBAUD_DEBUG("\nCould not init bus at requested speed!\n");
-        }
-        watchFor(); //allow any frame through
-        delay(600); //wait a bit for traffic to show up
-        if (numRxFrames > 0) 
-        {
-            AUTOBAUD_DEBUG(" SUCCESS!\n\n");
-            disable_autobaud_listen_mode(); //the default is to not be in listen only
-            reset_all_mailbox(); //return mailboxes to default state
-            return ret; //return the speed that succeeded
-        }
-        else AUTOBAUD_DEBUG(" FAILURE!\n"); 
-        speedCounter++;
-    }
-    AUTOBAUD_DEBUG("\nNo speeds worked! Are you sure you're connected to a CAN bus?!\n");
-    disable();
-    return 0; 
+	//set a list of speeds to check here. Terminate that list with 0 or you'll have a bad time.
+	uint32_t speeds[] = {250000ul, 500000ul, 1000000ul, 125000ul, 33333ul, 50000ul, 800000ul, 0};
+	int speedCounter = 0;
+	uint32_t ret;
+
+	enable_autobaud_listen_mode(); //go into listen only mode so we don't clobber the bus with a wrong speed setting
+	AUTOBAUD_DEBUG("\n");
+
+	while (speeds[speedCounter] != 0)
+	{
+		AUTOBAUD_DEBUG("\nTrying CAN rate: ");
+		AUTOBAUD_DEBUG(speeds[speedCounter]);
+		ret = init(speeds[speedCounter]);
+		if (ret == 0)
+		{
+			AUTOBAUD_DEBUG("\nCould not init bus at requested speed!\n");
+		}
+		for (int filter = 0; filter < 3; filter++) {
+			setRXFilter(filter, 0, 0, true);
+		}
+		//standard
+		for (int filter = 3; filter < 7; filter++) {
+			setRXFilter(filter, 0, 0, false);
+		}
+        for (int waiting = 0; waiting < 100; waiting++)
+		{
+			CAN_FRAME thisFrame;
+			if (rx_avail() > 0) {
+				read(thisFrame);
+				break;
+			}
+			delay(6);
+		}
+		if (numRxFrames > 0) 
+		{
+			AUTOBAUD_DEBUG(" SUCCESS!\n\n");
+			disable_autobaud_listen_mode(); //the default is to not be in listen only
+			reset_all_mailbox(); //return mailboxes to default state which is to let nothing through yet
+			init(ret);
+			return ret; //return the speed that succeeded
+		}
+		else AUTOBAUD_DEBUG(" FAILURE!\n"); 
+		speedCounter++;
+	}
+	AUTOBAUD_DEBUG("\nNo speeds worked! Are you sure you're connected to a CAN bus?!\n");
+	disable();
+	return 0; 
 }
 
 /*
@@ -205,7 +223,10 @@ uint32_t CANRaw::init(uint32_t ul_baudrate)
 	uint32_t ul_flag;
 	uint32_t ul_tick;
   
-  initializeBuffers();
+    initializeBuffers();
+    m_pCan->CAN_MR &= ~CAN_MR_CANEN; //immediately disable the CAN hardware if it had previously been enabled
+
+	uint32_t ul_status = m_pCan->CAN_SR; //read the status register just to be sure it gets cleared out
 	
 	numBusErrors = 0;
     numRxFrames = 0;
@@ -252,8 +273,6 @@ uint32_t CANRaw::init(uint32_t ul_baudrate)
 		ul_flag = m_pCan->CAN_SR;
 		ul_tick++;
 	}
-
-	disable_autobaud_listen_mode();
 	
 	//set a fairly low priority so almost anything can preempt.
 	//this has the effect that most anything can interrupt our interrupt handler
@@ -439,12 +458,44 @@ void CANRaw::disable()
 }
 
 /**
+ * \brief Set a CAN controller mode bit (disabling/reenabling if necessary)
+ *
+ */
+void CANRaw::setModeBit(uint32_t bit)
+{
+	uint32_t savedMR = m_pCan->CAN_MR;
+	m_pCan->CAN_MR &= ~CAN_MR_CANEN;
+	m_pCan->CAN_MR |= bit;
+	if (savedMR & CAN_MR_CANEN)
+	{
+		savedMR |= bit;
+		m_pCan->CAN_MR = savedMR;
+	}
+}
+
+/**
+ * \brief Unset a CAN controller mode bit (disabling/reenabling if necessary)
+ *
+ */
+void CANRaw::unsetModeBit(uint32_t bit)
+{
+	uint32_t savedMR = m_pCan->CAN_MR;
+	m_pCan->CAN_MR &= ~CAN_MR_CANEN;
+	m_pCan->CAN_MR &= ~bit;
+	if (savedMR & CAN_MR_CANEN)
+	{
+		savedMR &= ~bit;
+		m_pCan->CAN_MR = savedMR;
+	}
+}
+
+/**
  * \brief Disable CAN Controller low power mode.
  *
  */
 void CANRaw::disable_low_power_mode()
 {
-	m_pCan->CAN_MR &= ~CAN_MR_LPM;
+	unsetModeBit(CAN_MR_LPM);
 }
 
 /**
@@ -453,7 +504,7 @@ void CANRaw::disable_low_power_mode()
  */
 void CANRaw::enable_low_power_mode()
 {
-	m_pCan->CAN_MR |= CAN_MR_LPM;
+	setModeBit(CAN_MR_LPM);
 }
 
 /**
@@ -462,7 +513,7 @@ void CANRaw::enable_low_power_mode()
  */
 void CANRaw::disable_autobaud_listen_mode()
 {
-	m_pCan->CAN_MR &= ~CAN_MR_ABM;
+	unsetModeBit(CAN_MR_ABM);
 }
 
 /**
@@ -471,7 +522,7 @@ void CANRaw::disable_autobaud_listen_mode()
  */
 void CANRaw::enable_autobaud_listen_mode()
 {
-	m_pCan->CAN_MR |= CAN_MR_ABM;
+	setModeBit(CAN_MR_ABM);
 }
 
 /**
@@ -480,7 +531,7 @@ void CANRaw::enable_autobaud_listen_mode()
  */
 void CANRaw::disable_overload_frame()
 {
-	m_pCan->CAN_MR &= ~CAN_MR_OVL;
+	unsetModeBit(CAN_MR_OVL);
 }
 
 /**
@@ -490,7 +541,7 @@ void CANRaw::disable_overload_frame()
  */
 void CANRaw::enable_overload_frame()
 {
-	m_pCan->CAN_MR |= CAN_MR_OVL;
+	setModeBit(CAN_MR_OVL);
 }
 
 /**
@@ -503,9 +554,9 @@ void CANRaw::enable_overload_frame()
 void CANRaw::set_timestamp_capture_point(uint32_t ul_flag)
 {
 	if (ul_flag) {
-		m_pCan->CAN_MR |= CAN_MR_TEOF;
+		setModeBit(CAN_MR_TEOF);
 	} else {
-		m_pCan->CAN_MR &= ~CAN_MR_TEOF;
+		unsetModeBit(CAN_MR_TEOF);
 	}
 }
 
@@ -515,7 +566,7 @@ void CANRaw::set_timestamp_capture_point(uint32_t ul_flag)
  */
 void CANRaw::disable_time_triggered_mode()
 {
-	m_pCan->CAN_MR &= ~CAN_MR_TTM;
+	unsetModeBit(CAN_MR_TTM);
 }
 
 /**
@@ -524,7 +575,7 @@ void CANRaw::disable_time_triggered_mode()
  */
 void CANRaw::enable_time_triggered_mode()
 {
-	m_pCan->CAN_MR |= CAN_MR_TTM;
+	setModeBit(CAN_MR_TTM);
 }
 
 /**
@@ -533,7 +584,7 @@ void CANRaw::enable_time_triggered_mode()
  */
 void CANRaw::disable_timer_freeze()
 {
-	m_pCan->CAN_MR &= ~CAN_MR_TIMFRZ;
+	unsetModeBit(CAN_MR_TIMFRZ);
 }
 
 /**
@@ -542,7 +593,7 @@ void CANRaw::disable_timer_freeze()
  */
 void CANRaw::enable_timer_freeze()
 {
-	m_pCan->CAN_MR |= CAN_MR_TIMFRZ;
+	setModeBit(CAN_MR_TIMFRZ);
 }
 
 /**
@@ -551,7 +602,7 @@ void CANRaw::enable_timer_freeze()
  */
 void CANRaw::disable_tx_repeat()
 {
-	m_pCan->CAN_MR |= CAN_MR_DRPT;
+	setModeBit(CAN_MR_DRPT);
 }
 
 /**
@@ -560,7 +611,7 @@ void CANRaw::disable_tx_repeat()
  */
 void CANRaw::enable_tx_repeat()
 {
-	m_pCan->CAN_MR &= ~CAN_MR_DRPT;
+	unsetModeBit(CAN_MR_DRPT);
 }
 
 /**
@@ -838,7 +889,7 @@ void CANRaw::writeTxRegisters(const CAN_FRAME &txFrame, uint8_t mb)
 bool CANRaw::sendFrame(CAN_FRAME& txFrame) 
 {
    bool result=false;
-  
+
    irqLock();
   
    if ( isRingBufferEmpty(txRing) ) { // If there is nothing buffered, find free mailbox
