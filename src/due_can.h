@@ -209,6 +209,7 @@ public:
 	void mailbox_set_datalen(uint8_t uc_index, uint8_t dlen);
 	void mailbox_set_datal(uint8_t uc_index, uint32_t val);
 	void mailbox_set_datah(uint8_t uc_index, uint32_t val);
+	void  mailbox_set_rtr (uint8_t mbox,  uint8_t rtr) ;
 
 protected:
   struct ringbuffer_t {
