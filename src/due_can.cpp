@@ -867,6 +867,7 @@ void CANRaw::writeTxRegisters(const CAN_FRAME &txFrame, uint8_t mb)
 {
   mailbox_set_id(mb, txFrame.id, txFrame.extended);
   mailbox_set_datalen(mb, txFrame.length);
+  mailbox_set_rtr(mb, txFrame.rtr);
   mailbox_set_priority(mb, txFrame.priority);
   for (uint8_t cnt = 0; cnt < 8; cnt++)
   {    
@@ -1160,6 +1161,21 @@ void CANRaw::mailbox_set_datah(uint8_t uc_index, uint32_t val)
 {
 	if (uc_index > CANMB_NUMBER-1) uc_index = CANMB_NUMBER-1;
 	m_pCan->CAN_MB[uc_index].CAN_MDH = val;
+}
+
+/**
+ * \brief Set RTR for given mailbox
+ *
+ * \param mbox Which mailbox? (0-7)
+ * \param rtr value of RTR {0,1}
+ *
+ */
+void  CANRaw::mailbox_set_rtr (uint8_t mbox,  uint8_t rtr)
+{
+	if (mbox >= CANMB_NUMBER)  mbox = CANMB_NUMBER - 1;
+
+	if (rtr)  m_pCan->CAN_MB[mbox].CAN_MSR |=  CAN_MSR_MRTR;
+	else      m_pCan->CAN_MB[mbox].CAN_MSR &= ~CAN_MSR_MRTR;
 }
 
 /**
