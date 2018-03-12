@@ -989,6 +989,7 @@ uint32_t CANRaw::mailbox_read(uint8_t uc_index, volatile CAN_FRAME *rxframe)
 	rxframe->fid = m_pCan->CAN_MB[uc_index].CAN_MFID;
 	rxframe->length = (ul_status & CAN_MSR_MDLC_Msk) >> CAN_MSR_MDLC_Pos;
     rxframe->time   = (ul_status & CAN_MSR_MTIMESTAMP_Msk);
+	rxframe->rtr    = (m_pCan->CAN_MB[uc_index].CAN_MSR & CAN_MSR_MRTR) ? 1 : 0 ;
     ul_datal = m_pCan->CAN_MB[uc_index].CAN_MDL;
 	ul_datah = m_pCan->CAN_MB[uc_index].CAN_MDH;
 
