@@ -50,11 +50,16 @@ void loop(){
 
   if (Can0.available() > 0) {
 	Can0.read(incoming);
+	incoming.id += 1; //increment the ID
+	incoming.data.bytes[0] = 0xAA;
+	incoming.data.bytes[1] = incoming.data.bytes[2];
 	Can1.sendFrame(incoming);
 	//printFrame(incoming);  //uncomment line to print frames that are going out
    }
   if (Can1.available() > 0) {
 	Can1.read(incoming);
+	incoming.id = 0x320;
+	incoming.data.bytes[0] = 0;
 	Can0.sendFrame(incoming);
 	//printFrame(incoming);
   }
