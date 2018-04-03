@@ -248,6 +248,7 @@ private:
     ringbuffer_t txRing;
     ringbuffer_t rxRing;
     ringbuffer_t * txRings[CANMB_NUMBER];
+	uint8_t filterSet[CANMB_NUMBER];
 
     void writeTxRegisters(const CAN_FRAME &txFrame, uint8_t mb);
 	void setModeBit(uint32_t bit);

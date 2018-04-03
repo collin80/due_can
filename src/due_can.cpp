@@ -52,6 +52,7 @@ CANRaw::CANRaw(Can* pCan, uint32_t En ) : CAN_COMMON(8){
   // Initialize all message box spesific ring buffers to 0.
   for (uint8_t i=0; i<getNumMailBoxes(); i++) {
     txRings[i]=0;
+	filterSet[i] = 0;
   }
 }
 
@@ -817,8 +818,11 @@ void CANRaw::mailbox_init(uint8_t uc_index)
  */
 void CANRaw::reset_all_mailbox()
 {
-	for (uint8_t  i = 0;  i < CANMB_NUMBER;  i++)  
-		mailbox_init(i) ;
+	for (uint8_t  i = 0;  i < CANMB_NUMBER;  i++) 
+	{
+		mailbox_init(i);
+		filterSet[i] = 0;
+	}
 }
 
 void CANRaw::setBigEndian(bool end)  
@@ -1300,7 +1304,7 @@ void CANRaw::interruptHandler()
 int  CANRaw::findFreeRXMailbox () 
 {
 	for (int  c = 0;  c < getNumMailBoxes();  c++)
-		if ((mailbox_get_mode(c) == CAN_MB_RX_MODE) && (mailbox_get_id(c) == 0))  return c ;
+		if (filterSet[c] == 0) return c ;
 	return -1;
 }
 
@@ -1322,6 +1326,7 @@ int CANRaw::_setFilter(uint32_t id, uint32_t mask, bool extended)
 	mailbox_set_accept_mask(c, mask, extended);
 	mailbox_set_id(c, id, extended);
 	enable_interrupt(getMailboxIer(c));
+	filterSet[c] = 1;
 
 	return c;
 }
@@ -1344,6 +1349,7 @@ int CANRaw::_setFilterSpecific(uint8_t mailbox, uint32_t id, uint32_t mask, bool
 	mailbox_set_accept_mask(mailbox, mask, extended);
 	mailbox_set_id(mailbox, id, extended);
 	enable_interrupt(getMailboxIer(mailbox));
+	filterSet[mailbox] = 1;
 	return mailbox;
 }
 
