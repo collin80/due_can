@@ -252,8 +252,6 @@ private:
 	void setModeBit(uint32_t bit);
 	void unsetModeBit(uint32_t bit);
 	void mailbox_int_handler(uint8_t mb, uint32_t ul_status);
-
-	uint8_t enablePin;
 	
 	uint32_t write_id; //storage for an id. Will be used by the write function to set which ID to send to.
 	bool bigEndian;
