@@ -103,6 +103,8 @@ uint32_t CANRaw::set_baudrate(uint32_t ul_baudrate)
 		}
 	}
 
+	uint32_t ul_status = m_pCan->CAN_SR; //read the status register just to be sure it gets cleared out
+
 	/* Calculate the baudrate prescale value. */
 	uc_prescale = ul_mck / (ul_baudrate * uc_tq);
 
@@ -111,6 +113,7 @@ uint32_t CANRaw::set_baudrate(uint32_t ul_baudrate)
 
 	/* Before modifying the CANBR register, disable the CAN controller. */
 	//can_disable(m_pCan);
+	uint32_t oldCANMR = m_pCan->CAN_MR;
     m_pCan->CAN_MR &= ~CAN_MR_CANEN;
 
 	/* Write into the CAN baudrate register. */
@@ -119,6 +122,16 @@ uint32_t CANRaw::set_baudrate(uint32_t ul_baudrate)
 					CAN_BR_PROPAG(p_bit_time->uc_prog - 1) |
 					CAN_BR_SJW(p_bit_time->uc_sjw - 1) |
 					CAN_BR_BRP(uc_prescale - 1);
+
+	m_pCan->CAN_MR = oldCANMR; //restore mode register which might re-enable CAN
+
+    ul_status = m_pCan->CAN_SR; //read the status register just to be sure it gets cleared out
+	(void)ul_status;  // avoid compiler warnings	
+
+	numBusErrors = 0;
+    numRxFrames = 0;
+	busSpeed = ul_baudrate;	
+
 	return 1;
 }
 
@@ -417,8 +430,8 @@ bool CANRaw::removeFromRingBuffer (ringbuffer_t &ring, CAN_FRAME &msg)
 uint16_t CANRaw::ringBufferCount (ringbuffer_t &ring)
 {
     if (ring.tail == ring.head)  return 0 ;
-    if (ring.tail  < ring.head)  return ring.head - ring.tail ;
-	else                         return ring.size - ring.tail + ring.head ;
+    if (ring.tail < ring.head)   return ring.head - ring.tail ;
+	else                         return ring.size - ring.tail + ring.head;
 }
 
 void CANRaw::setListenOnlyMode(bool state) 
