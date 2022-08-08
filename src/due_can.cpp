@@ -219,7 +219,10 @@ void CANRaw::initializeBuffers()
 {
     if (isInitialized())  return ;
   
-  Serial.println("Initialize buffers");
+    // AP# qui gli è rimasto un vecchio Serial
+    // AP# Serial.println("Initialize buffers");
+    AUTOBAUD_DEBUG("Initialize buffers");
+	
 	// set up the transmit and receive ring buffers
 	if (tx_frame_buff==0) tx_frame_buff=new CAN_FRAME[sizeTxBuffer];
 	if (rx_frame_buff==0) rx_frame_buff=new CAN_FRAME[sizeRxBuffer];
@@ -909,6 +912,8 @@ bool CANRaw::sendFrame(CAN_FRAME& txFrame)
 	            if ( usesGlobalTxRing(mbox) && (m_pCan->CAN_MB[mbox].CAN_MSR & CAN_MSR_MRDY) ) {
 	               //is it also available (not sending anything?)
 	               writeTxRegisters(txFrame,mbox);
+		       // AP#
+                       okAllTx = 0; // Tx in corso.
 	               enable_interrupt(0x01u << mbox); //enable the TX interrupt for this box
 	               result = true; //we've sent it. mission accomplished.
 	               break; //no need to keep going. We sent our message
@@ -1443,6 +1448,8 @@ void CANRaw::mailbox_int_handler(uint8_t mb,  uint32_t /*ul_status*/)
 				if (removeFromRingBuffer(*pRing, tempFrame)) //if there is a frame in the queue to send
 					writeTxRegisters(tempFrame,mb);
 				else
+					// AP#
+                                        okAllTx = 1; // tx frame end
 					disable_interrupt(0x01 << mb);
 				break;
 				
@@ -1451,6 +1458,30 @@ void CANRaw::mailbox_int_handler(uint8_t mb,  uint32_t /*ul_status*/)
 		}
 	}
 }
+
+
+// AP#  the prerequisites for this to work is that you use only one mailbox in TX as it is by default.
+boolean CANRaw::isAllFrameSend(void) 
+{
+  return (okAllTx==1);
+}
+
+// AP#
+void CANRaw::ClearTxBuff(void)
+{
+    // the MB7 mailbox that is being sent cannot be deleted ...
+    // however, it is possible to delete the messages in the mailing queue so as to empty
+    // the queue and allow you to send or better put in the queue newer messages to send ...
+   
+    irqLock();
+
+    txRing.tail = txRing.head; // simple !
+    // if you want you can do the head = tail but I prefer tail = head!
+
+    irqRelease();
+}
+
+
 
 /**
  * \brief Interrupt dispatchers - Never directly call these
