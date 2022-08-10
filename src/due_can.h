@@ -122,6 +122,10 @@ public:
     // Constructor
     CANRaw( Can* pCan, uint32_t En);
 
+    // AP# the following 2 work if you use only one mailbox in TX and if you use the GlobalTxRing as it is by default.
+    boolean isAllFrameSend(void);  // return true se all frame is sended
+    void ClearTxBuff(void);        // clear all frame non already sended, but not abort frame current in sending. 
+
     // Before begin, you can define rx buffer size. Default is SIZE_RX_BUFFER. This does not have effect after begin.
     void setRxBufferSize(uint16_t size) { if (!isInitialized() ) sizeRxBuffer=size; }
 
@@ -260,6 +264,9 @@ private:
     
     uint32_t numBusErrors;
     uint32_t numRxFrames;
+    
+    // AP#
+    volatile uint8_t okAllTx = 1;   // 0 if frame transmission is still in progress. 1=ok send all.
 };
 
 extern CANRaw Can0;
